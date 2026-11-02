@@ -1,0 +1,97 @@
+name: axbridge-ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compiler:
+    name: Kompilator, audyt dostępności i testy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: compiler
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            compiler/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('compiler/Cargo.toml') }}
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --all
+
+      - name: Build compiler
+        run: cargo build --release
+
+      - name: Accessibility report of the golden path
+        run: ./target/release/axc audit ../compiler/tests/golden/app.ax
+
+      - name: Ability matrix
+        run: ./target/release/axc channels
+
+      - name: Build every target from the golden path
+        run: |
+          ./target/release/axc build ../compiler/tests/golden/app.ax --target web --out ./dist/web
+          ./target/release/axc build ../compiler/tests/golden/app.ax --target ios --out ./dist/ios
+          ./target/release/axc build ../compiler/tests/golden/app.ax --target android --out ./dist/android
+          ./target/release/axc build ../compiler/tests/golden/app.ax --target workers --out ./dist/workers
+
+      - name: Upload generated artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: axcode-dist
+          path: compiler/dist
+
+      - name: Runtime tests
+        run: |
+          node compiler/tests/crypto.test.js
+          node compiler/tests/morse.test.js
+
+  worker:
+    name: Składnia Workera i migracja
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: axbridge-production/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Syntax check of every worker module
+        run: |
+          for file in core.js auth.js comms.js social.js worker.js; do
+            node --check "$file"
+          done
+
+      - name: Validate migration SQL
+        run: |
+          node -e "const fs=require('fs');const sql=fs.readFileSync('migrations/0001_axbridge_v2.sql','utf8');if(!sql.includes('CREATE TABLE'))process.exit(1);console.log('migracja wygląda poprawnie');"
+
+      - name: API keys must never reach the backend
+        run: grep -q "API_KEY_FORBIDDEN" comms.js
+
+      - name: No trust in client-supplied identity
+        run: |
+          ! grep -q "X-User-Email" worker.js

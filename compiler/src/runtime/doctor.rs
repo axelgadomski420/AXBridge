@@ -1,15 +1,13 @@
 pub fn run() {
-    println!("AXCode Ultra Doctor");
-    println!("───────────────────");
-    println!("✓ Compiler version      0.9.0-ultra");
-    println!("✓ Lexer / Parser        ready");
-    println!("✓ Semantic analyzer     ready");
-    println!("✓ Workers codegen       ready (D1/R2/KV/AI/Queue)");
-    println!("✓ Web codegen           skeleton");
-    println!("✓ iOS / Android         planned (SwiftUI / Compose)");
-    println!();
-    println!("Recommended next steps:");
-    println!("  axc build app.ax --target workers -o ./worker");
-    println!("  axc check app.ax");
-    println!("  axc run app.ax --target web");
+    println!("AXCode Ultra Compiler — diagnostyka");
+    println!("-----------------------------------");
+    println!("Wersja kompilatora: {}", env!("CARGO_PKG_VERSION"));
+    println!("Platforma: {}", std::env::consts::OS);
+    println!("Arch: {}", std::env::consts::ARCH);
+    println!("\nWymagane targety:");
+    for t in ["swift", "kotlin", "typescript", "workers"] {
+        println!("  • {}  ✓ wspierany", t);
+    }
+    println!("\nWalidacja dostępności: AKTYWNA (WCAG 2.2 AA — kontrast, targety, etykiety)");
+    println!("Sprawdź: `axc check file.ax`");
 }

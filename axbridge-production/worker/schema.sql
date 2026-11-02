@@ -137,3 +137,46 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS idx_tiktak_created ON tiktak_posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id);
+-- Profil dostępności (kluczowy dla personalizacji)
+CREATE TABLE accessibility_profiles (
+  user_id TEXT PRIMARY KEY REFERENCES users(id),
+  preferred_input_channel TEXT CHECK(preferred_input_channel IN ('text','voice','morse','sign','music')),
+  preferred_output_channel TEXT CHECK(preferred_output_channel IN ('text','voice','morse','sign','vibration')),
+  morse_wpm INTEGER DEFAULT 15,
+  vibration_strength REAL DEFAULT 0.7,
+  text_scale REAL DEFAULT 1.0,
+  high_contrast BOOLEAN DEFAULT FALSE,
+  reduce_motion BOOLEAN DEFAULT FALSE,
+  tts_voice TEXT,
+  tts_rate REAL DEFAULT 0.5,
+  language TEXT DEFAULT 'pl',
+  simplified_mode BOOLEAN DEFAULT FALSE,
+  auto_send_enabled BOOLEAN DEFAULT FALSE,
+  auto_send_channels TEXT[] -- np. ['text','morse']
+);
+
+-- Zdarzenia alarmowe (tryb Pomoc)
+CREATE TABLE emergency_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  triggered_at TIMESTAMPTZ DEFAULT NOW(),
+  confirmed_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ NOT NULL, -- triggered_at + 15/30/60 min
+  location_precision TEXT CHECK(location_precision IN ('exact','approximate')),
+  notified_contacts TEXT[], -- lista user_id
+  delivery_status JSONB,
+  audit_log JSONB
+);
+
+-- Rekordy zgód (RODO)
+CREATE TABLE consent_records (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  purpose TEXT NOT NULL, -- np. 'ai_training','location_sharing','backup'
+  scope TEXT,
+  granted_at TIMESTAMPTZ DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ,
+  policy_version TEXT NOT NULL,
+  proof_of_consent TEXT -- hash podpisanego dokumentu
+);

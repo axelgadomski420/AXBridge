@@ -1,88 +1,89 @@
-//! Semantic analysis, type checking, persona resolution, provider validation
-
-use crate::error::{codes, AxError, AxResult};
-use crate::parser::AstNode;
-use std::collections::HashMap;
+use crate::ast::*;
+use crate::error::{AxError, AxResult};
+use std::collections::HashSet;
 use std::path::Path;
 
-#[derive(Debug, Default)]
-pub struct SemanticContext {
-    pub screens: HashMap<String, ()>,
-    pub components: HashMap<String, ()>,
-    pub stores: HashMap<String, String>,
-    pub functions: HashMap<String, ()>,
-    pub providers: HashMap<String, bool>, // id → enabled
-    pub persona: Option<String>,
-    pub has_admin_guard: bool,
-}
-
 pub fn check(path: &Path) -> AxResult<()> {
-    let source = std::fs::read_to_string(path)?;
-    let ast = crate::parser::parse_file(&source, path.to_str().unwrap_or("app.ax"))?;
-    let mut ctx = SemanticContext::default();
-    analyze(&ast, &mut ctx)?;
+    let src = std::fs::read_to_string(path)?;
+    let prog = crate::parser::Parser::new(&src)?.parse_program()?;
+    check_program(&prog)
+}
 
-    // Basic validations required by AXBridge Ultra
-    if !ctx.providers.contains_key("puter") {
-        // warning only in real impl
+pub fn check_program(prog: &Program) -> AxResult<()> {
+    // 1. Unique names per category
+    let mut screens = HashSet::new();
+    let mut data = HashSet::new();
+    let mut funcs = HashSet::new();
+    for item in &prog.items {
+        match item {
+            Item::Screen(s) => {
+                if !screens.insert(s.name.clone()) {
+                    return Err(AxError::semantic(format!("duplikat ekranu '{}'", s.name), 0, 0));
+                }
+            }
+            Item::Data(d) => {
+                if !data.insert(d.name.clone()) {
+                    return Err(AxError::semantic(format!("duplikat modelu '{}'", d.name), 0, 0));
+                }
+            }
+            Item::Function(f) => {
+                if !funcs.insert(f.name.clone()) {
+                    return Err(AxError::semantic(format!("duplikat funkcji '{}'", f.name), 0, 0));
+                }
+            }
+            _ => {}
+        }
+    }
+    // 2. Screen navigation targets exist
+    for item in &prog.items {
+        if let Item::Screen(s) = item {
+            for h in &s.handlers {
+                check_stmts(&h.body, &screens)?;
+            }
+            for n in &s.body {
+                check_ui_node(n, &screens)?;
+            }
+        }
+    }
+    // 3. Accessibility validation
+    let issues = crate::a11y_validator::validate(prog);
+    let criticals: Vec<_> = issues.iter().filter(|i| i.severity == crate::a11y_validator::Severity::Critical).collect();
+    if !criticals.is_empty() {
+        let mut msg = String::from("Błędy dostępności (critical):\n");
+        for i in criticals {
+            msg.push_str(&format!("  • [{}] {} — {}\n", i.rule, i.screen, i.message));
+        }
+        return Err(AxError::semantic(msg, 0, 0));
     }
     Ok(())
 }
 
-fn analyze(node: &AstNode, ctx: &mut SemanticContext) -> AxResult<()> {
-    match node {
-        AstNode::App { body, .. } => {
-            for child in body {
-                analyze(child, ctx)?;
+fn check_stmts(stmts: &[Stmt], screens: &HashSet<String>) -> AxResult<()> {
+    for s in stmts {
+        match s {
+            Stmt::Go { target } => {
+                let name = target.split('(').next().unwrap_or(target);
+                if !screens.contains(name) {
+                    return Err(AxError::semantic(format!("nawigacja do nieistniejącego ekranu '{}'", name), 0, 0));
+                }
             }
-        }
-        AstNode::Screen { name, body, .. } => {
-            ctx.screens.insert(name.clone(), ());
-            for child in body {
-                analyze(child, ctx)?;
+            Stmt::If { then, els, .. } => {
+                check_stmts(then, screens)?;
+                check_stmts(els, screens)?;
             }
-        }
-        AstNode::Component { name, body, .. } => {
-            ctx.components.insert(name.clone(), ());
-            for child in body {
-                analyze(child, ctx)?;
+            Stmt::For { body, .. } => check_stmts(body, screens)?,
+            Stmt::Call { on_success, on_error, .. } => {
+                check_stmts(on_success, screens)?;
+                check_stmts(on_error, screens)?;
             }
+            _ => {}
         }
-        AstNode::Function { name, body, .. } => {
-            ctx.functions.insert(name.clone(), ());
-            for child in body {
-                analyze(child, ctx)?;
-            }
-        }
-        AstNode::ProviderDecl { id, .. } => {
-            ctx.providers.insert(id.clone(), true);
-        }
-        AstNode::PersonaSet { value } => {
-            ctx.persona = Some(value.clone());
-        }
-        _ => {}
     }
     Ok(())
 }
 
-pub fn validate_provider_usage(provider: &str, ctx: &SemanticContext) -> AxResult<()> {
-    match ctx.providers.get(provider) {
-        Some(true) => Ok(()),
-        Some(false) => Err(AxError::Semantic {
-            code: codes::PROVIDER_DISABLED,
-            message_pl: format!("Provider „{}” jest wyłączony.", provider),
-            message_en: format!("Provider “{}” is disabled.", provider),
-            span: 0..0,
-            file: "app.ax".into(),
-            suggestion: Some("Włącz go w Ustawienia → Dostawcy API".into()),
-        }),
-        None => Err(AxError::Semantic {
-            code: codes::PROVIDER_DISABLED,
-            message_pl: format!("Nieznany provider „{}”.", provider),
-            message_en: format!("Unknown provider “{}”.", provider),
-            span: 0..0,
-            file: "app.ax".into(),
-            suggestion: Some("Dodaj go w ProvidersSettings".into()),
-        }),
-    }
+fn check_ui_node(n: &Node, screens: &HashSet<String>) -> AxResult<()> {
+    if let Some(body) = &n.on_tap { check_stmts(body, screens)?; }
+    for c in &n.children { check_ui_node(c, screens)?; }
+    Ok(())
 }

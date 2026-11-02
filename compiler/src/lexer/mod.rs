@@ -1,290 +1,234 @@
-//! Ultra Lexer for AXCode
-//! Handles indentation, music/translate/provider keywords, comments, source maps
+use crate::error::{AxError, AxResult};
 
-use logos::Logos;
-
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip r"[ \t\f]+")]
-pub enum Token {
-    // Keywords – core
-    #[token("app")]
-    App,
-    #[token("version")]
-    Version,
-    #[token("language")]
-    Language,
-    #[token("supports")]
-    Supports,
-    #[token("screen")]
-    Screen,
-    #[token("component")]
-    Component,
-    #[token("state")]
-    State,
-    #[token("global")]
-    Global,
-    #[token("data")]
-    Data,
-    #[token("store")]
-    Store,
-    #[token("theme")]
-    Theme,
-    #[token("style")]
-    Style,
-    #[token("function")]
-    Function,
-    #[token("when")]
-    When,
-    #[token("if")]
-    If,
-    #[token("else")]
-    Else,
-    #[token("for")]
-    For,
-    #[token("in")]
-    In,
-    #[token("list")]
-    List,
-    #[token("item")]
-    Item,
-    #[token("empty")]
-    Empty,
-    #[token("return")]
-    Return,
-    #[token("try")]
-    Try,
-    #[token("catch")]
-    Catch,
-    #[token("finally")]
-    Finally,
-
-    // UI primitives
-    #[token("column")]
-    Column,
-    #[token("row")]
-    Row,
-    #[token("text")]
-    Text,
-    #[token("button")]
-    Button,
-    #[token("field")]
-    Field,
-    #[token("image")]
-    Image,
-    #[token("card")]
-    Card,
-    #[token("checkbox")]
-    Checkbox,
-    #[token("toggle")]
-    Toggle,
-    #[token("slider")]
-    Slider,
-    #[token("spinner")]
-    Spinner,
-    #[token("badge")]
-    Badge,
-    #[token("chip")]
-    Chip,
-    #[token("avatar")]
-    Avatar,
-    #[token("cameraPreview")]
-    CameraPreview,
-    #[token("floatingButton")]
-    FloatingButton,
-    #[token("sectionHeader")]
-    SectionHeader,
-    #[token("settingsItem")]
-    SettingsItem,
-    #[token("modeChip")]
-    ModeChip,
-    #[token("helpItem")]
-    HelpItem,
-    #[token("circle")]
-    Circle,
-    #[token("spacer")]
-    Spacer,
-    #[token("tab")]
-    Tab,
-
-    // Events & actions
-    #[token("tapped")]
-    Tapped,
-    #[token("changed")]
-    Changed,
-    #[token("appears")]
-    Appears,
-    #[token("launches")]
-    Launches,
-    #[token("go")]
-    Go,
-    #[token("to")]
-    To,
-    #[token("back")]
-    Back,
-    #[token("set")]
-    Set,
-    #[token("add")]
-    Add,
-    #[token("remove")]
-    Remove,
-    #[token("update")]
-    Update,
-    #[token("save")]
-    Save,
-    #[token("load")]
-    Load,
-    #[token("show")]
-    Show,
-    #[token("alert")]
-    Alert,
-    #[token("toast")]
-    Toast,
-    #[token("notification")]
-    Notification,
-
-    // Ultra features
-    #[token("translate")]
-    Translate,
-    #[token("music")]
-    Music,
-    #[token("generate")]
-    Generate,
-    #[token("play")]
-    Play,
-    #[token("reaction")]
-    Reaction,
-    #[token("persona")]
-    Persona,
-    #[token("provider")]
-    Provider,
-    #[token("tiktak")]
-    TikTak,
-    #[token("community")]
-    Community,
-    #[token("admin")]
-    Admin,
-    #[token("offline")]
-    Offline,
-    #[token("first")]
-    First,
-    #[token("encrypted")]
-    Encrypted,
-    #[token("sync")]
-    Sync,
-    #[token("online")]
-    Online,
-
-    // Types
-    #[token("Text")]
-    TypeText,
-    #[token("Number")]
-    TypeNumber,
-    #[token("Boolean")]
-    TypeBoolean,
-    #[token("Date")]
-    TypeDate,
-    #[token("List")]
-    TypeList,
-
-    // Literals
-    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]
-    StringLit(String),
-
-    #[regex(r"[0-9]+\.?[0-9]*", |lex| lex.slice().to_string())]
-    NumberLit(String),
-
-    #[token("true")]
-    True,
-    #[token("false")]
-    False,
-    #[token("none")]
-    None,
-    #[token("null")]
-    Null,
-
-    // Identifiers
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
+#[derive(Debug, Clone, PartialEq)]
+pub enum Tok {
     Ident(String),
-
-    // Symbols
-    #[token("=")]
-    Eq,
-    #[token("+")]
-    Plus,
-    #[token("-")]
-    Minus,
-    #[token("*")]
-    Star,
-    #[token("/")]
-    Slash,
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
-    #[token("[")]
-    LBracket,
-    #[token("]")]
-    RBracket,
-    #[token(",")]
-    Comma,
-    #[token(".")]
-    Dot,
-    #[token(":")]
-    Colon,
-    #[token("->")]
-    Arrow,
-    #[token("=>")]
-    FatArrow,
-    #[token("?")]
-    Question,
-
-    // Comments & newlines / indentation handled separately
-    #[regex(r"//[^\n]*", logos::skip)]
-    Comment,
-
-    #[token("\n")]
+    Str(String),
+    Num(f64),
+    Color(String),      // #RRGGBB
+    Indent,
+    Dedent,
     Newline,
+    Eof,
 
-    #[error]
-    Error,
+    LParen, RParen, LBracket, RBracket, LBrace, RBrace,
+    Comma, Dot, Colon, Semi, Question,
+    Assign, EqEq, NotEq,
+    Plus, Minus, Star, Slash,
+    Lt, LtEq, Gt, GtEq,
+    Arrow,
+    Pipe,
 }
 
 #[derive(Debug, Clone)]
-pub struct TokenInfo {
-    pub token: Token,
-    pub span: std::ops::Range<usize>,
+pub struct Token {
+    pub tok: Tok,
     pub line: usize,
     pub col: usize,
 }
 
-pub fn tokenize(source: &str) -> Vec<TokenInfo> {
-    let mut tokens = Vec::new();
-    let mut line = 1;
-    let mut last_line_start = 0;
+pub struct Lexer {
+    chars: Vec<char>,
+    pos: usize,
+    line: usize,
+    col: usize,
+    indents: Vec<usize>,
+    pending_dedents: usize,
+    at_line_start: bool,
+    out: Vec<Token>,
+}
 
-    let mut lexer = Token::lexer(source);
-
-    while let Some(token) = lexer.next() {
-        let span = lexer.span();
-        // very simple line tracking
-        let slice = &source[last_line_start..span.start];
-        let newlines = slice.matches('\n').count();
-        if newlines > 0 {
-            line += newlines;
-            last_line_start = span.start - slice.rfind('\n').map(|i| slice.len() - i - 1).unwrap_or(0);
-        }
-        let col = span.start - last_line_start + 1;
-
-        if let Ok(t) = token {
-            if t != Token::Newline {
-                tokens.push(TokenInfo {
-                    token: t,
-                    span: span.start..span.end,
-                    line,
-                    col,
-                });
-            }
+impl Lexer {
+    pub fn new(src: &str) -> Self {
+        Self {
+            chars: src.chars().collect(),
+            pos: 0, line: 1, col: 1,
+            indents: vec![0],
+            pending_dedents: 0,
+            at_line_start: true,
+            out: Vec::new(),
         }
     }
-    tokens
+
+    fn peek(&self) -> Option<char> { self.chars.get(self.pos).copied() }
+    fn peek2(&self) -> Option<char> { self.chars.get(self.pos + 1).copied() }
+    fn bump(&mut self) -> Option<char> {
+        let c = self.peek()?;
+        self.pos += 1;
+        if c == '\n' { self.line += 1; self.col = 1; }
+        else { self.col += 1; }
+        Some(c)
+    }
+
+    fn push(&mut self, tok: Tok) {
+        self.out.push(Token { tok, line: self.line, col: self.col });
+    }
+
+    pub fn tokenize(mut self) -> AxResult<Vec<Token>> {
+        while self.pos < self.chars.len() {
+            if self.pending_dedents > 0 {
+                self.push(Tok::Dedent);
+                self.pending_dedents -= 1;
+                continue;
+            }
+            if self.at_line_start {
+                let emitted = self.handle_indent()?;
+                if emitted { continue; }
+                self.at_line_start = false;
+            }
+            let c = match self.peek() { Some(c) => c, None => break };
+
+            // comments
+            if c == '/' && self.peek2() == Some('/') {
+                while let Some(ch) = self.peek() {
+                    if ch == '\n' { break; }
+                    self.bump();
+                }
+                continue;
+            }
+            // whitespace
+            if c == ' ' || c == '\t' || c == '\r' { self.bump(); continue; }
+            if c == '\n' {
+                self.bump();
+                self.push(Tok::Newline);
+                self.at_line_start = true;
+                continue;
+            }
+            // strings
+            if c == '"' {
+                self.bump();
+                let mut s = String::new();
+                while let Some(ch) = self.peek() {
+                    if ch == '"' { self.bump(); break; }
+                    if ch == '\\' {
+                        self.bump();
+                        if let Some(esc) = self.bump() {
+                            s.push(match esc { 'n' => '\n', 't' => '\t', 'r' => '\r', '"' => '"', '\\' => '\\', o => o });
+                        }
+                    } else { s.push(ch); self.bump(); }
+                }
+                self.push(Tok::Str(s));
+                continue;
+            }
+            // colors
+            if c == '#' {
+                self.bump();
+                let mut hex = String::from("#");
+                for _ in 0..8 {
+                    if let Some(ch) = self.peek() {
+                        if ch.is_ascii_hexdigit() { hex.push(ch); self.bump(); } else { break; }
+                    }
+                }
+                self.push(Tok::Color(hex));
+                continue;
+            }
+            // numbers
+            if c.is_ascii_digit() {
+                let mut n = String::new();
+                while let Some(ch) = self.peek() {
+                    if ch.is_ascii_digit() || ch == '.' || ch == '_' {
+                        if ch != '_' { n.push(ch); }
+                        self.bump();
+                    } else { break; }
+                }
+                let v: f64 = n.parse().map_err(|_| AxError::lex(format!("zła liczba: {}", n), self.line, self.col))?;
+                self.push(Tok::Num(v));
+                continue;
+            }
+            // identifiers / keywords
+            if c.is_alphabetic() || c == '_' {
+                let mut id = String::new();
+                while let Some(ch) = self.peek() {
+                    if ch.is_alphanumeric() || ch == '_' { id.push(ch); self.bump(); } else { break; }
+                }
+                self.push(Tok::Ident(id));
+                continue;
+            }
+            // punctuation
+            self.bump();
+            match c {
+                '(' => self.push(Tok::LParen),
+                ')' => self.push(Tok::RParen),
+                '[' => self.push(Tok::LBracket),
+                ']' => self.push(Tok::RBracket),
+                '{' => self.push(Tok::LBrace),
+                '}' => self.push(Tok::RBrace),
+                ',' => self.push(Tok::Comma),
+                '.' => self.push(Tok::Dot),
+                ':' => self.push(Tok::Colon),
+                ';' => self.push(Tok::Semi),
+                '?' => self.push(Tok::Question),
+                '+' => self.push(Tok::Plus),
+                '*' => self.push(Tok::Star),
+                '/' => self.push(Tok::Slash),
+                '|' => self.push(Tok::Pipe),
+                '=' => {
+                    if self.peek() == Some('=') { self.bump(); self.push(Tok::EqEq); }
+                    else { self.push(Tok::Assign); }
+                }
+                '!' => {
+                    if self.peek() == Some('=') { self.bump(); self.push(Tok::NotEq); }
+                    else { return Err(AxError::lex("'!' tylko jako '!='", self.line, self.col)); }
+                }
+                '<' => {
+                    if self.peek() == Some('=') { self.bump(); self.push(Tok::LtEq); }
+                    else { self.push(Tok::Lt); }
+                }
+                '>' => {
+                    if self.peek() == Some('=') { self.bump(); self.push(Tok::GtEq); }
+                    else { self.push(Tok::Gt); }
+                }
+                '-' => {
+                    if self.peek() == Some('>') { self.bump(); self.push(Tok::Arrow); }
+                    else { self.push(Tok::Minus); }
+                }
+                _ => return Err(AxError::lex(format!("nieoczekiwany znak '{}'", c), self.line, self.col)),
+            }
+        }
+        while self.indents.len() > 1 {
+            self.indents.pop();
+            self.push(Tok::Dedent);
+        }
+        self.push(Tok::Eof);
+        Ok(self.out)
+    }
+
+    fn handle_indent(&mut self) -> AxResult<bool> {
+        let mut spaces = 0usize;
+        while let Some(c) = self.peek() {
+            match c {
+                ' ' => { spaces += 1; self.bump(); }
+                '\t' => { spaces += 4; self.bump(); }
+                _ => break,
+            }
+        }
+        // Empty line or comment-only
+        match self.peek() {
+            Some('\n') | None => { return Ok(false); }
+            Some('/') if self.peek2() == Some('/') => { return Ok(false); }
+            _ => {}
+        }
+        let current = *self.indents.last().unwrap();
+        if spaces > current {
+            self.indents.push(spaces);
+            self.push(Tok::Indent);
+            Ok(true)
+        } else if spaces < current {
+            while *self.indents.last().unwrap() > spaces {
+                self.indents.pop();
+                self.pending_dedents += 1;
+            }
+            if *self.indents.last().unwrap() != spaces {
+                return Err(AxError::lex("niespójne wcięcie", self.line, self.col));
+            }
+            // Emit first dedent now
+            if self.pending_dedents > 0 {
+                self.push(Tok::Dedent);
+                self.pending_dedents -= 1;
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
 }

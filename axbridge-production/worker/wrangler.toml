@@ -3,7 +3,6 @@ main = "worker.js"
 compatibility_date = "2026-10-30"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
-routes = []
 
 [assets]
 directory = "../public"
@@ -13,6 +12,7 @@ binding = "ASSETS"
 binding = "AL_DB"
 database_name = "al2100"
 database_id = "1431274d-c8d8-431b-aa1f-eaff2c466ada"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "AL_KV"
@@ -25,7 +25,20 @@ bucket_name = "al2100"
 [ai]
 binding = "AI"
 
-# Opcjonalna kolejka – odkomentuj po utworzeniu (npx wrangler queues create al2100beta):
-# [[queues.producers]]
-# binding = "AL_QUEUE"
-# queue = "al2100beta"
+[[queues.producers]]
+binding = "AL_QUEUE"
+queue = "al2100beta"
+
+[[queues.consumers]]
+queue = "al2100beta"
+max_batch_size = 10
+max_batch_timeout = 10
+max_retries = 8
+dead_letter_queue = "al2100beta-dlq"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+ALLOWED_ORIGINS = "https://axcode.vercel.app,http://localhost:8787"
+ADMIN_EMAIL = "axelgadomski@icloud.com"

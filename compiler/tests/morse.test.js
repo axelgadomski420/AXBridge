@@ -1,0 +1,2 @@
+import{strict as assert}from"node:assert";import{encodeMorse,decodeMorse,morseTimeline,quizMorse,MORSE_TABLE}from"../runtime/morse.js";
+assert.equal(encodeMorse("SOS AX"),"... --- ... / .- -..-");assert.equal(decodeMorse("... --- ... / .- -..-"),"SOS AX");assert.equal(morseTimeline(".",20)[0].duration,60);assert.equal(morseTimeline("-",20)[0].duration,180);assert.equal(quizMorse(()=>0).character,"A");assert.throws(()=>decodeMorse("ABC"));assert.equal(Object.keys(MORSE_TABLE).length>=26,true);assert.equal(decodeMorse(encodeMorse("ZAŻÓŁĆ")),"ZAŻÓŁĆ");console.log("morse: ok");

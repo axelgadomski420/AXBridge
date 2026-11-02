@@ -1,0 +1,190 @@
+// Aplikacja referencyjna AXCode — ścieżka krytyczna dostępnościowego komunikatora.
+app "AXBridge Golden"
+version "2.0.0"
+language pl
+supports ios android web
+orientation automatic
+offline first
+
+theme default
+  follows system
+  color primary #6D28D9
+  color danger #B91C1C
+
+style title
+  font size 30
+  weight bold
+
+style body
+  font size 16
+  weight regular
+
+data AccessibilityProfile
+  preferredInput Text
+  preferredOutput Text
+  morseWpm Number
+  vibrationStrength Number
+  textScale Number
+  highContrast Boolean
+  reduceMotion Boolean
+  confirmBeforeSend Boolean
+  autoSendChannels List<Text>
+
+data Message
+  id Text
+  conversationId Text
+  senderId Text
+  type Text
+  body Text
+  ciphertext Text
+  nonce Text
+  createdAt Date
+  status Text
+  confidence Number?
+
+store profile local
+  single AccessibilityProfile
+  key "axbridge.profile.v2"
+  encrypted true
+
+store messages local
+  list Message
+  key "axbridge.messages.v2"
+  encrypted true
+
+global state isOnline Boolean = true
+global state pendingCount Number = 0
+global state lastError Text = ""
+global state transcript Text = ""
+global state transcriptConfidence Number = 0
+
+function confirmTranscript(confirmBeforeSend Boolean, autoSendChannels List<Text>) Boolean
+  if confirmBeforeSend is true
+    return false
+  return true
+
+screen Onboarding
+  title "Witaj w AXBridge"
+  state step Number = 1
+
+  column
+    text "Komunikator dla każdego"
+      style title
+    text "Wybierz sposób rozmowy. Zawsze możesz to zmienić."
+      style body
+    button
+      label "Osoba głucha — migowy i napisy"
+      height 52
+      accessibility label "Osoba głucha, wejście migowe, wyjście tekstowe"
+      when tapped
+        set profile.preferredInput = "sign"
+        set profile.preferredOutput = "text"
+        go Chat
+    button
+      label "Osoba niewidoma — mowa"
+      height 52
+      accessibility label "Osoba niewidoma, wejście i wyjście głosowe"
+      when tapped
+        set profile.preferredInput = "speech"
+        set profile.preferredOutput = "speech"
+        go Chat
+    button
+      label "Osoba głuchoniewidoma — Morse i wibracje"
+      height 52
+      accessibility label "Głuchoniewidomy, wejście Morse, wyjście haptyczne"
+      when tapped
+        set profile.preferredInput = "morse"
+        set profile.preferredOutput = "haptic"
+        set profile.reduceMotion = true
+        go Chat
+
+screen Chat
+  title "Rozmowa"
+  state draft Text = ""
+  state showConfidence Boolean = true
+
+  list messages
+    aria-live polite
+    item message
+      text message.body
+        accessibility label "Wiadomość"
+
+  confirm transcript
+    channel "speech"
+    beforeSend true
+    accessibility label "Potwierdź transkrypcję przed wysłaniem"
+    text "AI proponuje, Ty zatwierdzasz."
+
+  row
+    button
+      label "Wyślij"
+      height 52
+      accessibility label "Wyślij wiadomość"
+      when tapped
+        set lastError = ""
+        call api
+          path "/api/conversations"
+          method "POST"
+          on success
+            set draft = ""
+            show toast "Wysłano"
+          on error
+            set lastError = "Nie udało się wysłać"
+
+    button
+      label "Pomoc"
+      height 52
+      accessibility label "Tryb Pomoc, przytrzymaj aby wezwać pomoc"
+      when tapped
+        go Emergency
+
+screen Emergency
+  title "Tryb Pomoc"
+
+  confirm alarm
+    beforeSend true
+    accessibility label "Potwierdź wysłanie alarmu do zaufanych kontaktów"
+
+  timer expiry
+    every "60s"
+    when online is false
+      set pendingCount = pendingCount + 1
+
+  button
+    label "Uruchom alarm"
+    height 56
+    accessibility label "Uruchom alarm z czasowym udostępnieniem lokalizacji"
+    when tapped
+      call api
+        path "/api/emergency"
+        method "POST"
+        on success
+          show toast "Alarm wysłany"
+        on error
+          set lastError = "Alarm nie został wysłany"
+
+screen Settings
+  title "Ustawienia dostępności"
+
+  toggle profile.highContrast
+    label "Wysoki kontrast"
+
+  toggle profile.reduceMotion
+    label "Ogranicz animacje"
+
+  slider profile.textScale
+    label "Skala tekstu"
+
+  slider profile.morseWpm
+    label "Tempo Morse'a (WPM)"
+
+  toggle profile.confirmBeforeSend
+    label "Potwierdzaj przed wysłaniem"
+
+  button
+    label "Zapisz ustawienia"
+    height 52
+    accessibility label "Zapisz ustawienia dostępności na tym urządzeniu"
+    when tapped
+      save profile
+      show toast "Zapisano"

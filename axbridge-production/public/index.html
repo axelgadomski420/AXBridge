@@ -1,898 +1,455 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0b0d12">
-<meta name="description" content="AXBridge — komunikator dostępnościowy. AI proponuje, człowiek decyduje.">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0F">
 <title>AXBridge</title>
 <style>
-:root{
-  --bg:#0b0d12; --bg-elev:#11141b; --bg-elev2:#161a23;
-  --card:rgba(255,255,255,.045); --card-hi:rgba(255,255,255,.08);
-  --stroke:rgba(255,255,255,.085); --stroke-hi:rgba(255,255,255,.16);
-  --txt:#f2f4f8; --txt-2:#aab2c0; --txt-3:#6b7382;
-  --accent:#0a84ff; --accent-soft:rgba(10,132,255,.14);
-  --ok:#32d074; --warn:#ffd60a; --err:#ff453a;
-  --bubble-me:linear-gradient(160deg,#1f7ae0,#0a5ec4);
-  --bubble-them:rgba(255,255,255,.065);
-  --r-l:20px; --r-m:14px; --r-s:10px;
-  --ease:cubic-bezier(.32,.72,.24,1);
-  --fs:16px;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{font-size:var(--fs)}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
-  background:var(--bg);color:var(--txt);line-height:1.47;min-height:100vh;
-  -webkit-font-smoothing:antialiased;letter-spacing:-.01em;
-  overflow-x:hidden;
-}
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:
-    radial-gradient(900px 500px at 85% -10%,rgba(10,132,255,.10),transparent 60%),
-    radial-gradient(700px 480px at -10% 110%,rgba(94,92,230,.07),transparent 60%);}
-body.reduce-motion *{transition:none!important;animation:none!important}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
-:focus-visible{outline:2.5px solid var(--warn);outline-offset:2px;border-radius:6px}
-.hidden{display:none!important}
-::selection{background:rgba(10,132,255,.35)}
-::-webkit-scrollbar{width:8px}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px;border:2px solid transparent;background-clip:content-box}
-
-/* ===== STRUCTURE ===== */
-#app{max-width:1160px;margin:0 auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:12px;min-height:100vh}
-
-/* ===== HEADER ===== */
-.hdr{
-  display:flex;align-items:center;gap:12px;padding:10px 14px;
-  background:rgba(17,20,27,.72);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);
-  border:1px solid var(--stroke);border-radius:calc(var(--r-m)+6px);
-  position:sticky;top:10px;z-index:20;
-  box-shadow:0 8px 32px rgba(0,0,0,.45);
-}
-.hdr .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.02rem;letter-spacing:-.02em}
-.hdr .logo .mark{width:30px;height:30px;border-radius:9px;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font-size:.9rem;
-  box-shadow:0 2px 12px rgba(10,132,255,.5)}
-.hdr .grow{flex:1}
-.hdr .who{font-size:.8rem;color:var(--txt-3);font-weight:600}
-.netchip{display:inline-flex;align-items:center;gap:7px;font-size:.78rem;font-weight:600;color:var(--txt-2);
-  background:var(--card);border:1px solid var(--stroke);padding:7px 13px;border-radius:99px}
-.netchip i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
-.netchip.off i{background:var(--warn);box-shadow:0 0 8px var(--warn)}
-
-/* ===== SEGMENTED NAV ===== */
-.segnav{
-  display:flex;gap:4px;padding:5px;border-radius:16px;
-  background:rgba(255,255,255,.04);border:1px solid var(--stroke);
-  overflow-x:auto;scrollbar-width:none;
-}
-.segnav::-webkit-scrollbar{display:none}
-.segnav button{
-  flex:1;white-space:nowrap;padding:9px 15px;border-radius:12px;
-  font-size:.86rem;font-weight:600;color:var(--txt-2);transition:all .22s var(--ease);min-height:42px;
-  display:flex;align-items:center;justify-content:center;gap:7px;
-}
-.segnav button:hover{color:var(--txt)}
-.segnav button[aria-selected="true"]{
-  background:var(--accent-soft);color:#7cc0ff;
-  box-shadow:inset 0 0 0 1px rgba(10,132,255,.3);
-}
-@media(max-width:720px){.segnav button span.lbl{display:none}}
-
-/* ===== PANELS / CARDS ===== */
-.panel{animation:panelIn .35s var(--ease)}
-@keyframes panelIn{from{opacity:0;transform:translateY(10px) scale(.995)}}
-.card{
-  background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-l);
-  padding:22px;backdrop-filter:blur(8px);
-}
-.card h2{font-size:1.06rem;font-weight:700;letter-spacing:-.015em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.sub{color:var(--txt-3);font-size:.8rem;margin:4px 0 14px}
-.grid{display:grid;gap:14px}
-@media(min-width:800px){.grid.two{grid-template-columns:1fr 1fr}}
-.row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--stroke)}
-.row:last-child{border-bottom:0}
-.row b{font-size:.9rem;font-weight:600;display:block}
-.row small{color:var(--txt-3);font-size:.76rem}
-.tag{font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;
-  background:var(--accent-soft);color:#7cc0ff}
-.tag.ok{background:rgba(50,208,116,.13);color:var(--ok)}
-.tag.warn{background:rgba(255,214,10,.12);color:var(--warn)}
-
-/* ===== BUTTONS ===== */
-.btn{
-  padding:11px 18px;border-radius:12px;min-height:44px;
-  background:var(--card-hi);border:1px solid var(--stroke-hi);
-  font-size:.88rem;font-weight:600;letter-spacing:0;
-  transition:all .18s var(--ease);
-}
-.btn:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.22);transform:translateY(-1px)}
-.btn:active{transform:scale(.97)}
-.btn.pri{background:var(--accent);border-color:transparent;color:#fff;box-shadow:0 4px 18px rgba(10,132,255,.35)}
-.btn.pri:hover{background:#2f95ff;box-shadow:0 6px 24px rgba(10,132,255,.45)}
-.btn.danger{color:var(--err);border-color:rgba(255,69,58,.35)}
-.btn.danger:hover{background:rgba(255,69,58,.08)}
-.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
-input,select,textarea{
-  font:inherit;background:rgba(255,255,255,.05);border:1px solid var(--stroke);
-  color:var(--txt);border-radius:12px;padding:11px 14px;min-height:44px;width:100%;
-  transition:border .18s var(--ease);
-}
-input:focus{outline:none;border-color:rgba(10,132,255,.55);box-shadow:0 0 0 3.5px rgba(10,132,255,.12)}
-input::placeholder{color:var(--txt-3)}
-label{font-size:.82rem;font-weight:600;color:var(--txt-2);display:block;margin:12px 0 7px}
-
-/* iOS SWITCH */
-.sw{width:50px;height:30px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;flex-shrink:0;
-  transition:background .22s var(--ease);border:1px solid transparent}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;
-  background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:left .22s var(--ease)}
-.sw[aria-checked="true"]{background:var(--ok);border-color:transparent}
-.sw[aria-checked="true"]::after{left:22px}
-
-/* ===== CHAT LAYOUT ===== */
-.chatgrid{display:grid;gap:14px}
-@media(min-width:860px){.chatgrid{grid-template-columns:300px 1fr}}
-.convitem{width:100%;display:flex;gap:12px;align-items:center;padding:11px 12px;border-radius:var(--r-m);
-  text-align:left;transition:background .18s var(--ease);border:1px solid transparent;min-height:60px}
-.convitem:hover{background:var(--card-hi)}
-.convitem[aria-current="true"]{background:var(--accent-soft);border-color:rgba(10,132,255,.22)}
-.av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:.95rem;color:#fff;background:linear-gradient(160deg,#3d9eff,#1f5fd6);
-  box-shadow:0 2px 10px rgba(10,132,255,.3)}
-.convitem b{font-size:.9rem;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.convitem small{color:var(--txt-3);font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.msgs{display:flex;flex-direction:column;gap:3px;max-height:46vh;overflow-y:auto;padding:10px 6px;margin:10px 0;
-  scroll-behavior:smooth}
-.bub{max-width:76%;padding:9px 15px 8px;font-size:.94rem;position:relative;animation:bubIn .3s var(--ease)}
-@keyframes bubIn{from{opacity:0;transform:translateY(8px) scale(.96)}}
-.bub.them{align-self:flex-start;background:var(--bubble-them);border:1px solid var(--stroke);
-  border-radius:19px 19px 19px 6px;color:var(--txt)}
-.bub.me{align-self:flex-end;background:var(--bubble-me);color:#fff;
-  border-radius:19px 19px 6px 19px;box-shadow:0 2px 14px rgba(10,132,255,.25)}
-.bub small{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:.66rem;opacity:.72;font-weight:500}
-.bub.them small{opacity:.55}
-.tick{color:#8ef0b4}
-.composer{display:flex;gap:8px;align-items:center}
-.composer input{flex:1;border-radius:22px;padding:12px 18px}
-.composer .send{
-  width:46px;height:46px;border-radius:50%;flex-shrink:0;background:var(--accent);color:#fff;font-size:1.05rem;
-  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(10,132,255,.4);
-  transition:all .18s var(--ease)}
-.composer .send:hover{transform:scale(1.06)}
-.composer .send:active{transform:scale(.92)}
-.typing{align-self:flex-start;display:flex;gap:4px;padding:13px 16px;background:var(--bubble-them);
-  border-radius:19px 19px 19px 6px;border:1px solid var(--stroke)}
-.typing i{width:7px;height:7px;border-radius:50%;background:var(--txt-3);animation:tp 1.2s infinite}
-.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
-@keyframes tp{30%{transform:translateY(-4px);opacity:1}60%{transform:none;opacity:.4}}
-
-/* ===== SOS ===== */
-.soswrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 0}
-.sos{width:176px;height:176px;border-radius:50%;position:relative;touch-action:none;
-  background:radial-gradient(circle at 34% 28%,#ff7a8f,#e02847 58%,#8f0e24);
-  color:#fff;font-weight:800;font-size:.92rem;letter-spacing:.1em;line-height:1.5;
-  box-shadow:0 10px 44px rgba(224,40,71,.4),inset 0 -8px 24px rgba(0,0,0,.35);
-  transition:transform .18s var(--ease)}
-.sos:active{transform:scale(.96)}
-.sos.armed{background:radial-gradient(circle at 34% 28%,#ffd97a,#e08a1e 58%,#7a4500);
-  box-shadow:0 10px 44px rgba(224,138,30,.45)}
-.sos::after{content:"";position:absolute;inset:-9px;border-radius:50%;
-  border:2px solid rgba(255,255,255,.14);pointer-events:none}
-.sos.armed::after{animation:sosp 1s ease-out infinite}
-@keyframes sosp{from{transform:scale(.92);opacity:1}to{transform:scale(1.22);opacity:0}}
-.cd{font-family:ui-monospace,monospace;font-size:2.1rem;font-weight:700;color:var(--warn);
-  text-shadow:0 0 20px rgba(255,214,10,.3);letter-spacing:.02em}
-.seg{display:flex;gap:4px;padding:4px;background:rgba(255,255,255,.05);border-radius:12px;border:1px solid var(--stroke)}
-.seg button{padding:8px 14px;border-radius:9px;font-size:.82rem;font-weight:600;color:var(--txt-2);
-  transition:all .18s var(--ease);min-height:40px}
-.seg button[aria-pressed="true"],.seg button.sel{background:var(--accent-soft);color:#7cc0ff;box-shadow:inset 0 0 0 1px rgba(10,132,255,.3)}
-
-/* ===== MORSE PAD ===== */
-.pad{height:180px;border-radius:18px;border:1.5px solid var(--stroke);background:rgba(255,255,255,.035);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  user-select:none;touch-action:none;transition:all .2s var(--ease);cursor:pointer}
-.pad:active,.pad.on{border-color:rgba(10,132,255,.6);background:rgba(10,132,255,.09);box-shadow:0 0 0 4px rgba(10,132,255,.1)}
-.morseout{font-family:ui-monospace,monospace;font-size:1.45rem;letter-spacing:.3em;color:#7cc0ff;
-  min-height:2rem;word-break:break-all;text-shadow:0 0 12px rgba(10,132,255,.35)}
-
-/* ===== MUSIC ===== */
-.moods{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
-.mood{padding:18px 8px;border-radius:16px;background:var(--card);border:1px solid var(--stroke);
-  text-align:center;transition:all .2s var(--ease);min-height:100px}
-.mood:hover{border-color:var(--stroke-hi);background:var(--card-hi);transform:translateY(-2px)}
-.mood:active{transform:scale(.95)}
-.mood .em{font-size:1.7rem;display:block;margin-bottom:6px}
-.mood b{font-size:.78rem;font-weight:600;color:var(--txt-2)}
-.pulse{display:flex;gap:4px;align-items:center;justify-content:center;height:36px}
-.pulse i{width:5px;border-radius:3px;background:var(--accent);height:8px;animation:pp 1s ease-in-out infinite}
-@keyframes pp{50%{transform:scaleY(2.8)}}
-
-/* ===== SUGGESTIONS ===== */
-.suggs{display:flex;gap:8px;flex-wrap:wrap}
-.suggs button{padding:9px 15px;border-radius:99px;font-size:.83rem;font-weight:500;
-  background:var(--accent-soft);border:1px solid rgba(10,132,255,.25);color:#9ed0ff;
-  transition:all .18s var(--ease)}
-.suggs button:hover{background:rgba(10,132,255,.22);transform:translateY(-1px)}
-.suggs button:active{transform:scale(.96)}
-
-/* ===== ONBOARDING SHEET ===== */
-.sheetveil{position:fixed;inset:0;background:rgba(5,6,10,.62);backdrop-filter:blur(14px);
-  display:flex;align-items:center;justify-content:center;padding:18px;z-index:50;animation:veilIn .3s var(--ease)}
-@keyframes veilIn{from{opacity:0}}
-.sheet{background:var(--bg-elev);border:1px solid var(--stroke-hi);border-radius:26px;padding:30px;
-  max-width:780px;width:100%;max-height:92vh;overflow:auto;
-  box-shadow:0 40px 120px rgba(0,0,0,.7),0 0 0 .5px rgba(255,255,255,.06) inset;animation:sheetIn .4s var(--ease)}
-@keyframes sheetIn{from{opacity:0;transform:translateY(26px) scale(.97)}}
-.sheet h1{font-size:1.55rem;font-weight:800;letter-spacing:-.025em}
-.sheet .lead{color:var(--txt-2);font-size:.92rem;margin:8px 0 18px;max-width:56ch}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px;margin:0 0 18px}
-.pcard{padding:15px 14px;border-radius:16px;background:var(--card);border:1.5px solid var(--stroke);
-  text-align:left;min-height:100px;transition:all .2s var(--ease)}
-.pcard:hover{border-color:var(--stroke-hi);transform:translateY(-2px)}
-.pcard[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 4px 20px rgba(10,132,255,.2)}
-.pcard .ic{font-size:1.4rem}
-.pcard b{display:block;font-size:.85rem;margin:6px 0 2px;font-weight:600}
-.pcard span{color:var(--txt-3);font-size:.74rem}
-
-/* ===== TOASTS ===== */
-#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;
-  gap:8px;z-index:60;width:min(92vw,460px);align-items:center}
-.toast{background:var(--bg-elev);border:1px solid var(--stroke-hi);border-radius:14px;padding:11px 18px;
-  font-size:.85rem;font-weight:600;box-shadow:0 12px 44px rgba(0,0,0,.55);
-  display:flex;align-items:center;gap:9px;animation:toastIn .35s var(--ease);max-width:100%}
-.toast::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.toast.ok::before{background:var(--ok)} .toast.warn::before{background:var(--warn)} .toast.err::before{background:var(--err)}
-@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.96)}}
-.toast.out{opacity:0;transform:translateY(8px);transition:all .3s var(--ease)}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.hc note{display:none}
+:root{--bg:#0A0A0F;--surface:#14141F;--surface2:#1E1E2E;--border:#2A2A3E;--text:#F5F5F7;--muted:#8B8B9E;--primary:#8B5CF6;--primary-dark:#7C3AED;--accent:#06B6D4;--success:#10B981;--danger:#EF4444;--radius:18px;--shadow:0 8px 32px rgba(0,0,0,.4)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,system-ui,sans-serif;background:radial-gradient(ellipse at 50% 0%,#1A1030 0%,#0A0A0F 60%);color:var(--text);font-size:16px;line-height:1.5;height:100vh;height:100dvh;overflow:hidden;-webkit-font-smoothing:antialiased}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.screen{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.screen.center{align-items:center;justify-content:center;text-align:center}
+h1{font-size:32px;font-weight:800;letter-spacing:-.8px;background:linear-gradient(135deg,#fff,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+h2{font-size:22px;font-weight:700;letter-spacing:-.4px}
+h3{font-size:17px;font-weight:600}
+p{color:var(--muted)}
+.caption{font-size:13px;color:var(--muted)}
+button{font:inherit;font-weight:600;border:none;border-radius:var(--radius);padding:15px 20px;cursor:pointer;min-height:48px;transition:transform .1s,box-shadow .2s;position:relative}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 20px rgba(139,92,246,.4)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost{background:transparent;color:var(--muted)}
+.btn-danger{background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff}
+.btn-success{background:linear-gradient(135deg,#10B981,#059669);color:#fff}
+.btn-full{width:100%}
+.btn-icon{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:20px;border-radius:50%}
+input,textarea,select{font:inherit;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;color:var(--text);min-height:48px;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary)}
+textarea{resize:vertical;min-height:70px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.card{background:linear-gradient(145deg,rgba(30,30,48,.9),rgba(20,20,32,.9));border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.row{display:flex;gap:10px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(15,15,25,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0;position:sticky;top:0;z-index:10}
+.topbar h2{flex:1}
+.tabs{display:flex;background:rgba(15,15,25,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1;padding:10px 4px;font-size:10px;background:transparent;color:var(--muted);border-radius:0;min-height:56px;display:flex;flex-direction:column;gap:3px;align-items:center}
+.tabs button.active{color:var(--primary)}
+.tabs .icon{font-size:22px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--surface2);color:var(--text);font-size:14px;font-weight:500;border:1px solid var(--border);cursor:pointer;min-height:38px}
+.chip.active{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-color:transparent}
+.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0}
+.avatar.large{width:96px;height:96px;font-size:40px}
+.msg{max-width:85%;padding:12px 16px;border-radius:18px;margin-bottom:10px;line-height:1.5;word-wrap:break-word;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.msg.assistant{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg pre{background:rgba(0,0,0,.3);padding:10px;border-radius:8px;overflow-x:auto;font-size:13px;margin:8px 0}
+.msg code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;font-size:13px}
+.sources{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px}
+.sources a{color:var(--accent);text-decoration:none;display:block;margin:4px 0;word-break:break-word}
+.typing{display:inline-flex;gap:4px;padding:8px 0}
+.typing span{width:8px;height:8px;background:var(--muted);border-radius:50%;animation:bounce 1.4s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+.input-bar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,15,25,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);align-items:flex-end;flex-shrink:0}
+.input-bar textarea{min-height:44px;max-height:120px;padding:11px 15px;border-radius:22px}
+.send-btn{width:48px;height:48px;padding:0;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-radius:50%;font-size:18px;flex-shrink:0;box-shadow:0 4px 16px rgba(139,92,246,.4)}
+.empty{text-align:center;padding:48px 24px;color:var(--muted);display:flex;flex-direction:column;gap:8px;align-items:center}
+.empty-icon{font-size:56px;opacity:.5}
+.alert{padding:12px 16px;border-radius:14px;font-size:14px;border:1px solid transparent}
+.alert.error{background:rgba(239,68,68,.15);color:#FCA5A5;border-color:rgba(239,68,68,.3)}
+.alert.info{background:rgba(6,182,212,.15);color:#67E8F9;border-color:rgba(6,182,212,.3)}
+.alert.success{background:rgba(16,185,129,.15);color:#6EE7B7;border-color:rgba(16,185,129,.3)}
+.badge{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px}
+.video-container{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;aspect-ratio:4/3}
+.video-container video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.gesture-badge{position:absolute;bottom:10px;left:10px;background:rgba(139,92,246,.9);color:#fff;padding:6px 14px;border-radius:999px;font-weight:600;font-size:14px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(30,30,48,.98);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;z-index:9999;border:1px solid var(--border);box-shadow:var(--shadow)}
+audio{width:100%;margin-top:12px;border-radius:12px}
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app"></div>
+<script type="module">
+// ============================================================
+// AXBridge Frontend v2.0
+// Konta · AI Chat z wyszukiwarką · Generator muzyki · Migowy
+// ============================================================
 
-  <header class="hdr">
-    <div class="logo"><div class="mark" aria-hidden="true">⚡</div>AXBridge</div>
-    <div class="grow"></div>
-    <span class="who" id="whoami"></span>
-    <span class="netchip" id="netchip" role="status"><i aria-hidden="true"></i><span id="netlbl">Online · E2EE</span></span>
-  </header>
-
-  <nav class="segnav" role="tablist" aria-label="Moduły">
-    <button role="tab" aria-selected="true" data-p="chat">💬<span class="lbl">Czat</span></button>
-    <button role="tab" aria-selected="false" data-p="assistant">✨<span class="lbl">Asystent</span></button>
-    <button role="tab" aria-selected="false" data-p="voice">🎤<span class="lbl">Mowa</span></button>
-    <button role="tab" aria-selected="false" data-p="morse">⏓<span class="lbl">Morse</span></button>
-    <button role="tab" aria-selected="false" data-p="sign">✋<span class="lbl">Mig</span></button>
-    <button role="tab" aria-selected="false" data-p="music">🎵<span class="lbl">Muzyka</span></button>
-    <button role="tab" aria-selected="false" data-p="sos">🆘<span class="lbl">Pomoc</span></button>
-    <button role="tab" aria-selected="false" data-p="privacy">🔒<span class="lbl">Prywatność</span></button>
-    <button role="tab" aria-selected="false" data-p="profile">⚙︎<span class="lbl">Profil</span></button>
-    <button role="tab" aria-selected="false" data-p="log">📋<span class="lbl">Dziennik</span></button>
-  </nav>
-
-  <!-- CZAT -->
-  <section class="panel" id="p-chat" role="tabpanel" aria-label="Czat">
-    <div class="chatgrid">
-      <div class="card">
-        <h2>Rozmowy</h2><p class="sub">End-to-end encrypted · grupy do 8 osób</p>
-        <div id="convList" role="list"></div>
-        <button class="btn" id="btnAddContact" style="margin-top:12px;width:100%">＋ Nowy kontakt</button>
-      </div>
-      <div class="card">
-        <h2 id="chatTitle">—</h2><p class="sub" id="chatSub"></p>
-        <div class="msgs" id="msgs" role="log" aria-live="polite" aria-label="Wiadomości"></div>
-        <div class="composer">
-          <input id="msgIn" placeholder="Wiadomość…" aria-label="Treść wiadomości">
-          <button class="send" id="btnSend" aria-label="Wyślij wiadomość">↑</button>
-        </div>
-        <p class="sub" style="margin-top:10px" id="queueInfo"></p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ASYSTENT -->
-  <section class="panel hidden" id="p-assistant" role="tabpanel" aria-label="Asystent AI">
-    <div class="grid two">
-      <div class="card">
-        <h2>Asystent <span class="tag ok">AI proponuje · Ty decydujesz</span></h2>
-        <p class="sub">Podpowiedzi odpowiedzi na podstawie ostatniej wiadomości. Nic nie wysyła się bez Twojego kliknięcia. Online: model przez /api/translate. Offline: propozycje lokalne.</p>
-        <div id="aiLast" role="status" style="padding:13px 15px;border:1px dashed var(--stroke-hi);border-radius:14px;min-height:52px;color:var(--txt-2);font-size:.9rem"></div>
-        <div class="suggs" id="aiSugg" style="margin-top:12px"></div>
-        <label for="aiFree">Własne polecenie</label>
-        <input id="aiFree" placeholder="np. „uprość tę wiadomość”, „zaproponuj uprzejmą odmowę”">
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn pri" id="btnAiRun" style="flex:1">✨ Generuj</button>
-          <button class="btn" id="btnAiSimplify">🧩 Uprość</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Zasady</h2>
-        <div class="row"><div><b>Domyślnie lokalnie</b><small>Chmura tylko za wyraźną zgodą</small></div><span class="tag ok">on-device</span></div>
-        <div class="row"><div><b>Bez pamięci między rozmowami</b><small>Kontekst: tylko bieżąca wiadomość</small></div><span class="tag">dane</span></div>
-        <div class="row"><div><b>Uczciwe granice</b><small>Nie tłumaczy w sprawach medycznych i prawnych</small></div><span class="tag warn">granice</span></div>
-        <div class="row"><div><b>Brak auto-send</b><small>Wysyłanie bez potwierdzenia tylko jawnie włączone</small></div><span class="tag ok">zasada</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- MOWA -->
-  <section class="panel hidden" id="p-voice" role="tabpanel" aria-label="Mowa">
-    <div class="grid two">
-      <div class="card">
-        <h2>Tekst → mowa <span class="tag ok">lokalnie</span></h2>
-        <p class="sub">Syntezator systemowy. Działa offline.</p>
-        <label for="ttsIn">Zdanie</label>
-        <input id="ttsIn" placeholder="Wpisz lub wybierz poniżej…">
-        <div class="suggs" style="margin:12px 0 0">
-          <button data-say="Dzień dobry, słyszę Państwa?">„Dzień dobry”</button>
-          <button data-say="Proszę o chwilę, napiszę odpowiedź.">„Chwila proszę”</button>
-          <button data-say="Dziękuję bardzo.">„Dziękuję”</button>
-        </div>
-        <label for="ttsRate">Tempo: <span id="rateVal">1.0×</span></label>
-        <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" aria-label="Tempo mowy">
-        <button class="btn pri" id="btnSpeak" style="margin-top:14px;width:100%">🔊 Wypowiedz</button>
-      </div>
-      <div class="card">
-        <h2>Mowa → tekst <span class="tag ok">lokalnie</span></h2>
-        <p class="sub">Rozpoznawanie systemowe. Zawsze popraw przed wysłaniem.</p>
-        <button class="btn pri" id="btnStt" style="width:100%">● Rozpoznawanie</button>
-        <div id="sttOut" role="status" style="margin-top:12px;padding:13px 15px;border:1px dashed var(--stroke-hi);border-radius:14px;min-height:52px;color:var(--txt-2);font-size:.9rem">Wynik pojawi się tutaj.</div>
-        <button class="btn hidden" id="btnSttSend" style="margin-top:10px;width:100%">Popraw i wyślij ➤</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- MORSE -->
-  <section class="panel hidden" id="p-morse" role="tabpanel" aria-label="Morse">
-    <div class="grid two">
-      <div class="card">
-        <h2>Klawisz Morse <span class="tag ok">offline</span></h2>
-        <p class="sub">Dotknij = kropka, przytrzymaj = kreska, pauza = nowa litera. Klawiatura/switch: „.” kropka, „-” kreska, „/” separator.</p>
-        <div class="pad" id="pad" role="button" tabindex="0" aria-label="Klawisz Morse: krótkie dotknięcie kropka, przytrzymanie kreska">
-          <div class="morseout" id="morseOut" aria-live="polite">&nbsp;</div>
-          <small style="color:var(--txt-3);letter-spacing:.12em;font-size:.72rem">DOTKNIJ I NADAWAJ</small>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-          <button class="btn pri" id="btnMorseSend">Wyślij ➤</button>
-          <button class="btn" id="btnMorseVib">📳 Wibracje</button>
-          <button class="btn" id="btnMorseClear">Wyczyść</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Tekst → Morse</h2>
-        <label for="txtIn" style="margin-top:6px">Tekst</label>
-        <input id="txtIn" placeholder="np. OK">
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn" id="btnTxt2MorseVib">📳 Wibracje</button>
-          <button class="btn" id="btnTxt2MorseOut">🔊 Dźwięk</button>
-        </div>
-        <div class="row" style="margin-top:10px"><div><b>Tempo</b><small>WPM</small></div>
-          <select id="wpm" style="width:104px" aria-label="Tempo Morse"><option>10</option><option selected>15</option><option>20</option><option>25</option></select></div>
-        <div class="row"><div><b>Długość kreski</b><small>ms przytrzymania</small></div>
-          <select id="dashMs" style="width:104px" aria-label="Długość kreski"><option>120</option><option selected>200</option><option>300</option><option>400</option></select></div>
-        <div class="row"><div><b>Tryb nauki</b><small>TTS czyta nadane litery</small></div>
-          <button class="sw" id="swLearn" role="switch" aria-checked="false" aria-label="Tryb nauki Morse"></button></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- MIG -->
-  <section class="panel hidden" id="p-sign" role="tabpanel" aria-label="Język migowy">
-    <div class="grid two">
-      <div class="card">
-        <h2>Język migowy <span class="tag">pilot · 60 znaków</span></h2>
-        <p class="sub">Rozpoznawanie lokalne z aparatu (mobilna). Zawsze widzisz pewność i zatwierdzasz przed wysłaniem.</p>
-        <div class="row"><div><b>Nagrywanie własnego znaku</b><small>Lokalnie, zaszyfrowane, bez uploadu</small></div><button class="btn" id="btnRecSign" style="padding:8px 14px">● Nagraj</button></div>
-        <div class="row"><div><b>Trening na moich nagraniach</b><small>Domyślnie wyłączony; zgoda odwoływalna</small></div><button class="sw" id="swTrain" role="switch" aria-checked="false" aria-label="Zgoda na trening z nagrań"></button></div>
-        <p class="sub" style="margin-top:14px;border-left:3px solid var(--warn);padding-left:12px;font-size:.8rem">
-          ⚠️ AXBridge nie jest pełnym tłumaczem języka migowego i nie zastępuje tłumacza w sytuacjach medycznych, prawnych ani kryzysowych. Nie ukrywamy pewności rozpoznania.</p>
-      </div>
-      <div class="card">
-        <h2>Zwroty</h2>
-        <p class="sub">Kliknij zwrot — przed wysłaniem zawsze potwierdzisz z poziomem pewności.</p>
-        <div class="suggs" id="signCands">
-          <button data-sign="Dzień dobry">Dzień dobry</button>
-          <button data-sign="Dziękuję">Dziękuję</button>
-          <button data-sign="Proszę">Proszę</button>
-          <button data-sign="Nie rozumiem">Nie rozumiem</button>
-          <button data-sign="Potrzebuję pomocy">Potrzebuję pomocy</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- MUZYKA -->
-  <section class="panel hidden" id="p-music" role="tabpanel" aria-label="Muzyka">
-    <div class="grid two">
-      <div class="card">
-        <h2>Muzyka jako komunikat <span class="tag">v1.0</span></h2>
-        <p class="sub">Reakcja emocjonalna + rytm, który odbiorca czuje haptyką. Wysyłasz świadomie, jak każdą wiadomość.</p>
-        <div class="moods" role="list" aria-label="Reakcje emocjonalne">
-          <button class="mood" data-mood="Spokój 🎼" data-vib="s"><span class="em" aria-hidden="true">🎼</span><b>Spokój</b></button>
-          <button class="mood" data-mood="Energia ⚡" data-vib="f"><span class="em" aria-hidden="true">⚡</span><b>Energia</b></button>
-          <button class="mood" data-mood="Czułość 💜" data-vib="s2"><span class="em" aria-hidden="true">💜</span><b>Czułość</b></button>
-          <button class="mood" data-mood="Tęsknota 🌧" data-vib="w"><span class="em" aria-hidden="true">🌧</span><b>Tęsknota</b></button>
-          <button class="mood" data-mood="Radość 🔥" data-vib="f"><span class="em" aria-hidden="true">🔥</span><b>Radość</b></button>
-          <button class="mood" data-mood="Marzenie 🌌" data-vib="w"><span class="em" aria-hidden="true">🌌</span><b>Marzenie</b></button>
-        </div>
-        <label for="songIn">Fragment utworu</label>
-        <input id="songIn" placeholder="tytuł — wykonawca">
-        <button class="btn" id="btnSendSong" style="margin-top:10px;width:100%">🎵 Wyślij</button>
-        <button class="btn" id="btnBeat" style="margin-top:8px;width:100%">🥁 Nagraj rytm dotykiem</button>
-      </div>
-      <div class="card">
-        <h2>Rytm → wibracje</h2>
-        <p class="sub">Podgląd pulsowania:</p>
-        <div class="pulse" id="vibPrev" aria-hidden="true"></div>
-        <div class="row" style="margin-top:12px"><div><b>Opis nastroju</b><small>Lokalnie, na urządzeniu</small></div><span class="tag ok">on-device</span></div>
-        <div class="row"><div><b>Synchronizacja haptyki</b><small>Automatyczna po odbiorze</small></div><span class="tag ok">tak</span></div>
-        <div class="row"><div><b>Pliki muzyczne</b><small>Nie wysyłamy plików bez wyraźnego żądania — licencje</small></div><span class="tag warn">granice</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SOS -->
-  <section class="panel hidden" id="p-sos" role="tabpanel" aria-label="Tryb Pomoc">
-    <div class="grid two">
-      <div class="card">
-        <div class="soswrap">
-          <h2 style="align-self:flex-start">Tryb Pomoc</h2>
-          <p class="sub" style="align-self:flex-start;margin-top:-10px">Przytrzymaj 3 s · potwierdź w 5 s · lokalizacja wygasa automatycznie.</p>
-          <button class="sos" id="sosBtn" aria-label="Przytrzymaj trzy sekundy, aby uzbroić alarm"><span id="sosLbl">PRZYTRZYMAJ<br>3 s</span></button>
-          <div class="cd" id="sosTimer" role="status" hidden>5.0</div>
-          <div class="seg" role="radiogroup" aria-label="Czas lokalizacji">
-            <button data-loc="15">📍 15 min</button>
-            <button data-loc="30" aria-pressed="true">📍 30 min</button>
-            <button data-loc="60">📍 60 min</button>
-          </div>
-          <button class="btn danger hidden" id="sosCancel" style="width:100%">✕ Anuluj alarm</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Kontakty zaufane</h2>
-        <p class="sub">Powiadomienie push + SMS. Test dostarczalności raz w tygodniu.</p>
-        <div id="sosContacts"></div>
-        <button class="btn" id="btnAddSos" style="margin-top:12px;width:100%">＋ Kontakt alarmowy</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRYWATNOŚĆ -->
-  <section class="panel hidden" id="p-privacy" role="tabpanel" aria-label="Prywatność">
-    <div class="grid two">
-      <div class="card">
-        <h2>Prywatność i dane</h2>
-        <p class="sub">Zero reklam, zero sprzedaży danych, zero profilowania.</p>
-        <div class="row"><div><b>Przetwarzanie w chmurze</b><small>Świadoma zgoda (CONSENT RECORD)</small></div><button class="sw" id="swCloud" role="switch" aria-checked="false" aria-label="Zgoda na chmurę"></button></div>
-        <div class="row"><div><b>Auto-send rozpoznanego tekstu</b><small>Tylko dla wybranych kanałów, jawnie</small></div><button class="sw" id="swAuto" role="switch" aria-checked="false" aria-label="Auto-send"></button></div>
-        <div class="row"><div><b>Eksport danych</b><small>RODO art. 20 · JSON</small></div><button class="btn" id="btnExport" style="padding:8px 14px">⤓</button></div>
-        <div class="row"><div><b>Usuń konto i dane</b><small>Podwójne potwierdzenie · 7 dni ochrony</small></div><button class="btn danger" id="btnDelete" style="padding:8px 14px">🗑</button></div>
-      </div>
-      <div class="card">
-        <h2>Bezpieczeństwo</h2>
-        <p class="sub">E2EE zawsze włączone — bez opcji wyłączenia.</p>
-        <div class="row"><div><b>Biometria</b><small>Tylko lokalnie (Face ID / odcisk)</small></div><button class="sw" id="swBio" role="switch" aria-checked="false" aria-label="Biometria"></button></div>
-        <div class="row"><div><b>Tryb wrażliwy</b><small>Ukrywanie treści na zrzutach</small></div><button class="sw" id="swSensitive" role="switch" aria-checked="false" aria-label="Tryb wrażliwy"></button></div>
-        <div class="row"><div><b>Safety numbers</b><small id="safetyNum">47120 88301 20944</small></div><span class="tag ok">zweryfikowane</span></div>
-        <div class="row"><div><b>Kody odzyskania</b><small>10 kodów · pokazane raz</small></div><button class="btn" style="padding:8px 14px">Wyświetl</button></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PROFIL -->
-  <section class="panel hidden" id="p-profile" role="tabpanel" aria-label="Profil dostępności">
-    <div class="card">
-      <h2>Profil dostępności <span class="tag ok">WCAG 2.2 AA</span></h2>
-      <p class="sub">Zapisane lokalnie, zastosowane natychmiast.</p>
-      <div class="row"><div><b>Kanał wejścia</b><small>Jak piszesz do aplikacji</small></div>
-        <select id="inCh" style="width:148px" aria-label="Kanał wejścia"><option>tekst</option><option>mowa</option><option>Morse</option><option>przełącznik</option></select></div>
-      <div class="row"><div><b>Kanał wyjścia</b><small>Jak aplikacja mówi do Ciebie</small></div>
-        <select id="outCh" style="width:148px" aria-label="Kanał wyjścia"><option>tekst</option><option>TTS</option><option>wibracje</option><option>TTS + wibracje</option></select></div>
-      <div class="row"><div><b>Rozmiar tekstu</b><small>Do 200% bez utraty treści</small></div>
-        <select id="fontScale" style="width:128px" aria-label="Rozmiar tekstu"><option value="16">100%</option><option value="19">120%</option><option value="22">140%</option><option value="26">160%</option><option value="32">200%</option></select></div>
-      <div class="row"><div><b>Wysoki kontrast</b><small>≥ 4.5:1 tekst · ≥ 3:1 UI</small></div><button class="sw" id="swHC" role="switch" aria-checked="false" aria-label="Wysoki kontrast"></button></div>
-      <div class="row"><div><b>Redukcja ruchu</b><small>Respektuje ustawienie systemowe</small></div><button class="sw" id="swRM" role="switch" aria-checked="false" aria-label="Redukcja ruchu"></button></div>
-      <div class="row"><div><b>Tryb uproszczony</b><small>Max 3 akcje na ekranie</small></div><button class="sw" id="swSimple" role="switch" aria-checked="false" aria-label="Tryb uproszczony"></button></div>
-    </div>
-  </section>
-
-  <!-- DZIENNIK -->
-  <section class="panel hidden" id="p-log" role="tabpanel" aria-label="Dziennik zdarzeń">
-    <div class="card">
-      <h2>Dziennik zdarzeń</h2>
-      <p class="sub">Audyt: alarmy, zgody, synchronizacje. Eksport dla służb.</p>
-      <div id="logList" style="max-height:52vh;overflow:auto"></div>
-      <button class="btn" id="btnLogExport" style="margin-top:12px">⤓ Eksportuj</button>
-    </div>
-  </section>
-</div>
-
-<!-- ONBOARDING -->
-<div class="sheetveil" id="onb" role="dialog" aria-modal="true" aria-labelledby="onbTitle">
-  <div class="sheet">
-    <h1 id="onbTitle">AXBridge</h1>
-    <p class="lead">Komunikator dostępnościowy. <b>AI proponuje, człowiek decyduje</b> — nic nie wychodzi bez Twojej decyzji. Wybierz profil; wszystko zmienisz później.</p>
-    <div class="pgrid" role="radiogroup" aria-label="Twój profil komunikacji">
-      <button class="pcard" role="radio" aria-checked="false" data-p="0"><span class="ic" aria-hidden="true">🤐</span><b>Niema / trudna mowa</b><span>tekst → TTS</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="1"><span class="ic" aria-hidden="true">🕶️</span><b>Niewidoma / słabowidząca</b><span>czytnik ekranu</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="2"><span class="ic" aria-hidden="true">🤟</span><b>Głucha / słabosłysząca</b><span>tekst + PJM</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="3"><span class="ic" aria-hidden="true">🖤</span><b>Głuchoniewidoma</b><span>Morse haptyczny</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="4"><span class="ic" aria-hidden="true">🦿</span><b>Ruchowa (switch)</b><span>jeden przełącznik</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="5"><span class="ic" aria-hidden="true">🧩</span><b>Neuroatypowa</b><span>tryb uproszczony</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="6"><span class="ic" aria-hidden="true">🫂</span><b>Opiekun / terapeuta</b><span>panel web</span></button>
-      <button class="pcard" role="radio" aria-checked="false" data-p="7"><span class="ic" aria-hidden="true">🙂</span><b>Partner komunikacji</b><span>rozmowa z pomocą</span></button>
-    </div>
-    <label for="onbName">Nazwa wyświetlana</label>
-    <input id="onbName" placeholder="np. Axel" autocomplete="nickname">
-    <button class="btn pri" id="onbGo" disabled style="width:100%;margin-top:16px">Rozpocznij</button>
-  </div>
-</div>
-
-<div id="toasts" aria-live="polite"></div>
-
-<script>
-"use strict";
-const LS="axbridge.v2";
-const defaults={name:"",persona:null,inCh:"tekst",outCh:"tekst",fontScale:16,hc:false,rm:false,simple:false,
-  cloud:false,autoSend:false,bio:false,sensitive:false,train:false,learn:false,wpm:15,dash:200,
-  convs:[{id:"c1",name:"Kontakt testowy",msgs:[],verified:true}],active:"c1",
-  sos:[{name:"Opiekun",chan:"push + SMS",ok:true}],locMin:30,log:[]};
-let S;
-try{S=Object.assign({},defaults,JSON.parse(localStorage.getItem(LS)||"{}"))}catch(e){S=Object.assign({},defaults)}
-const save=()=>localStorage.setItem(LS,JSON.stringify(S));
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function logEvent(kind,detail){S.log.unshift({t:new Date().toISOString(),kind,detail});S.log=S.log.slice(0,400);save();}
-function toast(msg,type=""){
-  const d=document.createElement("div");d.className="toast "+type;d.textContent=msg;
-  $("#toasts").appendChild(d);
-  try{navigator.vibrate&&navigator.vibrate(25)}catch(_){}
-  setTimeout(()=>{d.classList.add("out");setTimeout(()=>d.remove(),320)},3400);
-}
-/* ONBOARDING */
-$$("#onb .pcard").forEach(b=>b.onclick=()=>{
-  $$("#onb .pcard").forEach(x=>x.setAttribute("aria-checked","false"));
-  b.setAttribute("aria-checked","true");S.persona=+b.dataset.p;save();$("#onbGo").disabled=false;});
-$("#onbGo").onclick=()=>{
-  S.name=$("#onbName").value.trim()||"Użytkownik";
-  if(S.persona===3){S.inCh="Morse";S.outCh="wibracje";}
-  if(S.persona===1||S.persona===2){S.outCh="TTS";}
-  if(S.persona===5){S.simple=true;}
-  save();$("#onb").classList.add("hidden");$("#whoami").textContent=S.name;
-  logEvent("onboarding","profil "+S.persona);
-  toast("Gotowe, "+S.name+". Profil zapisany lokalnie.","ok");
+// ---------- stan ----------
+const S = {
+  screen: 'auth', // auth | register | login | main
+  tab: 'ai', // ai | music | sign | profile
+  token: localStorage.getItem('axb_token') || '',
+  user: JSON.parse(localStorage.getItem('axb_user') || 'null'),
+  aiMessages: [],
+  musicSongs: [],
+  aiInput: '',
+  aiLoading: false,
+  musicPrompt: '',
+  musicLyrics: '',
+  musicLoading: false,
+  lastAudioUrl: '',
+  signActive: false,
+  gestureName: '',
+  signHistory: [],
+  error: '',
+  toast: '',
+  form: { email: '', password: '', name: '' },
 };
-/* TABS */
-$$(".segnav button").forEach(t=>t.onclick=()=>{
-  $$(".segnav button").forEach(x=>x.setAttribute("aria-selected","false"));
-  t.setAttribute("aria-selected","true");
-  $$(".panel").forEach(p=>p.classList.add("hidden"));
-  $("#"+t.dataset.p).classList.remove("hidden");
-  if(t.dataset.p==="chat"){renderConvs();renderChat();}
-  if(t.dataset.p==="assistant"){renderAssistant();}
-  if(t.dataset.p==="log"){renderLog();}
-});
-const showTab=id=>$$(".segnav button").find(b=>b.dataset.p===id).click();
-/* NET */
-let online=navigator.onLine;
-const net=()=>{
-  online=navigator.onLine;
-  $("#netchip").classList.toggle("off",!online);
-  $("#netlbl").textContent=online?"Online · E2EE":"Offline · kolejka";
-  if(online)flushQueue();
+
+const $ = (h) => (document.getElementById('app').innerHTML = h);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const save = () => {
+  localStorage.setItem('axb_token', S.token);
+  localStorage.setItem('axb_user', JSON.stringify(S.user));
 };
-addEventListener("online",net);addEventListener("offline",net);
-/* CHAT */
-function renderConvs(){
-  const el=$("#convList");el.innerHTML="";
-  S.convs.forEach(c=>{
-    const b=document.createElement("button");
-    b.className="convitem";b.setAttribute("role","listitem");
-    b.setAttribute("aria-current",c.id===S.active);
-    const last=c.msgs[c.msgs.length-1];
-    b.innerHTML='<div class="av" aria-hidden="true">'+c.name[0].toUpperCase()+'</div><div style="min-width:0"><b>'+c.name+(c.verified?' <span class="tick" aria-label="zweryfikowano">✓</span>':'')+'</b><small>'+(last?last.text.slice(0,30):"Brak wiadomości")+'</small></div>';
-    b.onclick=()=>{S.active=c.id;save();renderChat();renderConvs();};
-    el.appendChild(b);
+const toast = (m) => { S.toast = m; render(); clearTimeout(window._tt); window._tt = setTimeout(() => { S.toast = ''; render(); }, 2500); };
+
+// ---------- API ----------
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(S.token ? { Authorization: `Bearer ${S.token}` } : {}),
+      ...(opts.headers || {}),
+    },
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
 }
-function renderChat(){
-  const c=S.convs.find(x=>x.id===S.active);if(!c)return;
-  $("#chatTitle").textContent=c.name;
-  $("#chatSub").textContent=(c.verified?"Klucze zweryfikowane · ":"")+"E2EE · "+S.inCh+" → "+S.outCh;
-  const m=$("#msgs");m.innerHTML="";
-  c.msgs.forEach(msg=>{
-    const d=document.createElement("div");d.className="bub "+(msg.me?"me":"them");
-    d.innerHTML=msg.text+"<small>"+(msg.me?"Ty · ":"")+(msg.status||"")+"</small>";
-    m.appendChild(d);
-  });
-  m.scrollTop=m.scrollHeight;
-  const q=c.msgs.filter(x=>x.status==="w kolejce").length;
-  $("#queueInfo").textContent=q?q+" wiadomości w kolejce — wyślą się automatycznie po powrocie sieci.":"";
+
+async function loadHistory() {
+  try {
+    const d = await api('/api/ai/history');
+    S.aiMessages = (d.history || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+      sources: m.sources ? JSON.parse(m.sources) : [],
+    }));
+    render();
+  } catch (_) {}
 }
-function lastIncoming(){
-  const c=S.convs.find(x=>x.id===S.active);if(!c)return "";
-  for(let i=c.msgs.length-1;i>=0;i--)if(!c.msgs[i].me)return c.msgs[i].text;
-  return "";
+
+async function loadSongs() {
+  try {
+    const d = await api('/api/music/list');
+    S.musicSongs = d.songs || [];
+    render();
+  } catch (_) {}
 }
-function showTyping(){
-  const m=$("#msgs");const t=document.createElement("div");t.className="typing";
-  t.innerHTML="<i></i><i></i><i></i>";m.appendChild(t);m.scrollTop=m.scrollHeight;
-  return ()=>t.remove();
+
+async function sendAI() {
+  if (!S.aiInput.trim() || S.aiLoading) return;
+  const q = S.aiInput.trim();
+  S.aiMessages.push({ role: 'user', content: q });
+  S.aiInput = '';
+  S.aiLoading = true;
+  render();
+  try {
+    const d = await api('/api/ai/chat', { method: 'POST', body: JSON.stringify({ message: q }) });
+    S.aiMessages.push({ role: 'assistant', content: d.answer, sources: d.sources });
+  } catch (e) {
+    S.aiMessages.push({ role: 'assistant', content: `⚠️ ${e.message}` });
+  }
+  S.aiLoading = false;
+  render();
+  setTimeout(() => { const el = document.getElementById('ai-end'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100);
 }
-function send(text,kind){
-  text=(text||"").trim();if(!text)return;
-  const c=S.convs.find(x=>x.id===S.active);if(!c)return;
-  const msg={id:crypto.randomUUID(),me:true,text,status:online?"wysłane":"w kolejce",kind:kind||"text",ts:Date.now()};
-  if(!online)msg.q=true;
-  c.msgs.push(msg);save();renderChat();renderConvs();
-  if(!online){logEvent("kolejka",text.slice(0,30));return;}
-  const c2=c,m2=msg;
-  setTimeout(()=>{m2.status="dostarczone ✓✓";save();renderChat();
-    const hide=showTyping();
-    setTimeout(()=>{hide();m2.status="odczytane ✓✓✓";save();renderChat();},900+Math.random()*800);
-  },600);
-}
-function flushQueue(){
-  let n=0;
-  S.convs.forEach(c=>c.msgs.forEach(m=>{if(m.q){m.q=false;m.status="wysłane";deliver2(c,m);n++;}}));
-  if(n){save();renderChat();toast("Kolejka offline wysłana: "+n+" wiadomości.","ok");logEvent("sync",n+" wiadomości");}
-}
-function deliver2(c,m){setTimeout(()=>{m.status="dostarczone ✓✓";save();renderChat();},600);}
-$("#btnSend").onclick=()=>send($("#msgIn").value);
-$("#msgIn").addEventListener("keydown",e=>{if(e.key==="Enter")send(e.target.value)});
-$("#btnAddContact").onclick=()=>{
-  const id=prompt("Identyfikator publiczny kontaktu (np. AX-1234):");
-  if(!id)return;S.convs.push({id:crypto.randomUUID(),name:id,msgs:[],verified:false});
-  save();renderConvs();toast("Kontakt dodany. Zweryfikuj klucze przy pierwszej rozmowie.","warn");
-};
-/* ASYSTENT */
-const LR={
-  default:["Dobrze, dzięki!","Rozumiem — odpiszę zaraz.","Dziękuję za wiadłość ❤️","Okay, umówione ⏰"],
-  pytanie:["Tak, zgadzam się.","Poproszę chwilę, odpiszę dokładnie.","Nie jestem pewien — dopytam."],
-  pomoc:["Już działam. Jestem przy tobie.","Sprawdź tryb Pomoc — kontakt alarmowy gotowy."]};
-function classify(t){const s=t.toLowerCase();
-  if(s.includes("pomoc")||s.includes("alarm")||s.includes("ratunek"))return "pomoc";
-  if(s.includes("?"))return "pytanie";return "default";}
-function renderAssistant(){
-  const last=lastIncoming();
-  $("#aiLast").textContent=last?("Ostatnia wiadomość: „"+last.replace(/<[^>]*>/g,"")+"”"):"Brak wiadomości od kontaktu w tej rozmowie.";
-  const el=$("#aiSugg");el.innerHTML="";
-  LR[classify(last)].forEach(t=>{
-    const b=document.createElement("button");b.type="button";b.textContent=t;
-    b.onclick=()=>{showTab("chat");$("#msgIn").value=t;$("#msgIn").focus();toast("Wstawiono propozycję. Wyślij, gdy gotowa.","ok");};
-    el.appendChild(b);
-  });
-}
-async function aiTranslate(prompt){
-  if(!online){toast("Offline — propozycje lokalne.","warn");return null;}
-  try{
-    const r=await fetch("/api/translate",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text:prompt,lang:"pl"})});
-    if(!r.ok)throw 0;
-    const j=await r.json();
-    return (j.text||j.result||j.translation||null);
-  }catch(e){toast("Model chmurowy niedostępny — propozycje lokalne.","warn");return null;}
-}
-$("#btnAiRun").onclick=async()=>{
-  const cmd=$("#aiFree").value.trim()||("Zaproponuj 3 krótkie odpowiedzi na wiadomość: "+lastIncoming());
-  const btn=$("#btnAiRun");btn.disabled=true;btn.textContent="⏳ Generuję…";
-  const out=await aiTranslate(cmd);
-  btn.disabled=false;btn.textContent="✨ Generuj";
-  if(out){
-    const el=$("#aiSugg");el.innerHTML="";
-    String(out).split("\n").map(x=>x.trim()).filter(Boolean).slice(0,4).forEach(t=>{
-      const b=document.createElement("button");b.type="button";b.textContent=t.slice(0,90);
-      b.onclick=()=>{showTab("chat");$("#msgIn").value=t;$("#msgIn").focus();};
-      el.appendChild(b);
+
+async function generateMusic() {
+  if (!S.musicPrompt.trim() || S.musicLoading) return;
+  S.musicLoading = true;
+  S.lastAudioUrl = '';
+  render();
+  try {
+    const d = await api('/api/music/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: S.musicPrompt, lyrics: S.musicLyrics }),
     });
-    logEvent("asystent","propozycje AI");
-  } else renderAssistant();
-};
-$("#btnAiSimplify").onclick=async()=>{
-  const last=lastIncoming();if(!last){toast("Brak wiadomości do uproszczenia.","warn");return;}
-  const out=await aiTranslate("Uprość do prostego języka, jedno zdanie, po polsku: "+last);
-  const s=out||("W skrócie: "+last.slice(0,60)+"…");
-  const el=$("#aiSugg");el.innerHTML="";
-  const b=document.createElement("button");b.type="button";b.textContent=s;
-  b.onclick=()=>{showTab("chat");$("#msgIn").value=s;$("#msgIn").focus();};
-  el.appendChild(b);
-  try{const u=new SpeechSynthesisUtterance(s);u.lang="pl-PL";speechSynthesis.speak(u);}catch(_){}
-};
-/* TTS/STT */
-function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.lang="pl-PL";u.rate=+$("#ttsRate").value;speechSynthesis.speak(u);}
-  catch(e){toast("Syntezator niedostępny w tej przeglądarce.","err");}}
-$("#btnSpeak").onclick=()=>speak($("#ttsIn").value);
-$("#ttsRate").oninput=e=>$("#rateVal").textContent=(+e.target.value).toFixed(1)+"×";
-$$("#p-voice [data-say]").forEach(b=>b.onclick=()=>{$("#ttsIn").value=b.dataset.say;speak(b.dataset.say);});
-let rec=null,recFinal="";
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-$("#btnStt").onclick=()=>{
-  if(!SR){toast("STT niedostępne w tej przeglądarce — na iOS 17+/Android 10+ działa natywnie.","warn");return;}
-  if(rec){rec.stop();return;}
-  rec=new SR();rec.lang="pl-PL";rec.interimResults=false;rec.continuous=false;
-  rec.onresult=e=>{recFinal=e.results[0][0].transcript;
-    $("#sttOut").innerHTML="„"+recFinal+"” <span class='tag ok'>lokalnie</span>";
-    $("#btnSttSend").classList.remove("hidden");toast("Rozpoznano. Popraw przed wysłaniem.","ok");};
-  rec.onerror=()=>{toast("Błąd rozpoznawania mowy.","err");};
-  rec.onend=()=>{rec=null;$("#btnStt").textContent="● Rozpoznawanie";};
-  rec.start();$("#btnStt").textContent="■ Zatrzymaj";
-};
-$("#btnSttSend").onclick=()=>{send(recFinal);$("#btnSttSend").classList.add("hidden");$("#sttOut").textContent="Wysłano.";};
-/* MORSE */
-const M={a:'.-',b:'-...',c:'-.-.',d:'-..',e:'.',f:'..-.',g:'--.',h:'....',i:'..',j:'.---',k:'-.-',l:'.-..',m:'--',n:'-.',o:'---',p:'.--.',q:'--.-',r:'.-.',s:'...',t:'-',u:'..-',v:'...-',w:'.--',x:'-..-',y:'-.--',z:'--..','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.','0':'-----'};
-const R={};Object.entries(M).forEach(([k,v])=>R[v]=k);
-let cur="",down=0,tHold=null,gap=null,lastLearn="";
-const pad=$("#pad");
-function draw(){$("#morseOut").textContent=cur||"\u00a0";}
-function vib(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(_){}}
-function learnLetter(l){
-  if(!S.learn||!R[cur.trim()]&&!l)return;
-  const ch=l||R[cur.trim()];
-  if(ch&&ch!==lastLearn){lastLearn=ch;try{const u=new SpeechSynthesisUtterance(ch);u.lang="pl-PL";speechSynthesis.speak(u);}catch(_){}}
+    S.lastAudioUrl = `/api/music/audio/${encodeURIComponent(d.audioKey)}`;
+    toast('🎵 Utwór gotowy!');
+    await loadSongs();
+  } catch (e) {
+    toast(`⚠️ ${e.message}`);
+  }
+  S.musicLoading = false;
+  render();
 }
-pad.addEventListener("pointerdown",e=>{e.preventDefault();clearTimeout(gap);pad.classList.add("on");down=Date.now();
-  tHold=setTimeout(()=>{cur+="-";draw();vib(+S.dash);},+S.dash);});
-addEventListener("pointerup",()=>{
-  pad.classList.remove("on");
-  if(down){if(Date.now()-down<+S.dash){clearTimeout(tHold);cur+=".";draw();vib(60);}down=0;}
-  clearTimeout(gap);gap=setTimeout(()=>{
-    if(cur&&!cur.endsWith(" ")){cur+=" ";draw();learnLetter();}
-  },700);
+
+// ---------- MediaPipe (rozpoznawanie gestów) ----------
+let gestureRecognizer = null;
+let videoEl = null;
+let lastGesture = '';
+
+async function initGesture() {
+  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const { GestureRecognizer, FilesetResolver } = vision;
+  const fileset = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+  );
+  gestureRecognizer = await GestureRecognizer.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+    },
+    runningMode: 'VIDEO',
+    numHands: 1,
+  });
+  toast('🤟 Rozpoznawanie gestów gotowe');
+}
+
+async function startSignRecognition() {
+  if (!gestureRecognizer) {
+    try { await initGesture(); } catch (e) { toast('Błąd MediaPipe: ' + e.message); return; }
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    videoEl = document.getElementById('sign-video');
+    if (!videoEl) return;
+    videoEl.srcObject = stream;
+    videoEl.play();
+    S.signActive = true;
+    render();
+    const loop = () => {
+      if (!S.signActive || !videoEl || videoEl.readyState < 2) { requestAnimationFrame(loop); return; }
+      const res = gestureRecognizer.recognizeForVideo(videoEl, performance.now());
+      if (res.gestures && res.gestures.length > 0) {
+        const g = res.gestures[0][0];
+        if (g.categoryName && g.categoryName !== 'None' && g.score > 0.6 && g.categoryName !== lastGesture) {
+          lastGesture = g.categoryName;
+          S.gestureName = `${g.categoryName} (${Math.round(g.score * 100)}%)`;
+          S.signHistory.unshift({ text: g.categoryName, ts: new Date().toISOString() });
+          if (S.signHistory.length > 20) S.signHistory.pop();
+          // Wstrzyknij do czatu AI jako wiadomość użytkownika (jeśli chcemy)
+          render();
+        }
+      }
+      requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    toast('Brak dostępu do kamery: ' + e.message);
+  }
+}
+
+function stopSignRecognition() {
+  S.signActive = false;
+  if (videoEl && videoEl.srcObject) {
+    videoEl.srcObject.getTracks().forEach((t) => t.stop());
+    videoEl.srcObject = null;
+  }
+  render();
+}
+
+// ---------- render ----------
+function render() {
+  let html = '';
+  if (S.screen === 'auth') html = renderAuth();
+  else if (S.screen === 'register') html = renderRegister();
+  else if (S.screen === 'login') html = renderLogin();
+  else html = renderMain();
+  if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
+  $(html);
+  if (S.signActive) {
+    const v = document.getElementById('sign-video');
+    if (v && videoEl && videoEl.srcObject) v.srcObject = videoEl.srcObject;
+  }
+}
+
+function renderAuth() {
+  return `<div class="screen center">
+    <div style="font-size:96px;filter:drop-shadow(0 8px 32px rgba(139,92,246,.5))">🌉</div>
+    <h1>AXBridge</h1>
+    <p style="max-width:320px">Komunikator nowej generacji.<br>AI · Muzyka · Migowy · Wszystko w jednym.</p>
+    <button class="btn-primary btn-full" style="margin-top:24px" onclick="S.screen='register';render()">Utwórz konto</button>
+    <button class="btn-secondary btn-full" onclick="S.screen='login';render()">Mam już konto</button>
+  </div>`;
+}
+
+function renderRegister() {
+  return `<div class="screen">
+    <h2>Utwórz konto</h2>
+    ${S.error ? `<div class="alert error">${esc(S.error)}</div>` : ''}
+    <div class="field"><label>Pseudonim</label><input value="${esc(S.form.name)}" oninput="S.form.name=this.value" placeholder="Twoje imię"></div>
+    <div class="field"><label>E-mail</label><input type="email" value="${esc(S.form.email)}" oninput="S.form.email=this.value"></div>
+    <div class="field"><label>Hasło</label><input type="password" value="${esc(S.form.password)}" oninput="S.form.password=this.value"></div>
+    <button class="btn-primary btn-full" onclick="doRegister()">Zarejestruj się</button>
+    <button class="btn-ghost btn-full" onclick="S.screen='login';render()">Mam konto</button>
+  </div>`;
+}
+
+function renderLogin() {
+  return `<div class="screen">
+    <h2>Zaloguj się</h2>
+    ${S.error ? `<div class="alert error">${esc(S.error)}</div>` : ''}
+    <div class="field"><label>E-mail</label><input type="email" value="${esc(S.form.email)}" oninput="S.form.email=this.value"></div>
+    <div class="field"><label>Hasło</label><input type="password" value="${esc(S.form.password)}" oninput="S.form.password=this.value"></div>
+    <button class="btn-primary btn-full" onclick="doLogin()">Zaloguj</button>
+    <button class="btn-ghost btn-full" onclick="S.screen='register';render()">Nie mam konta</button>
+  </div>`;
+}
+
+async function doRegister() {
+  S.error = '';
+  try {
+    const d = await api('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email: S.form.email, password: S.form.password, displayName: S.form.name }),
+    });
+    S.token = d.token;
+    S.user = d.user;
+    save();
+    S.screen = 'main';
+    render();
+    await Promise.all([loadHistory(), loadSongs()]);
+  } catch (e) {
+    S.error = e.message;
+    render();
+  }
+}
+
+async function doLogin() {
+  S.error = '';
+  try {
+    const d = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: S.form.email, password: S.form.password }),
+    });
+    S.token = d.token;
+    S.user = d.user;
+    save();
+    S.screen = 'main';
+    render();
+    await Promise.all([loadHistory(), loadSongs()]);
+  } catch (e) {
+    S.error = e.message;
+    render();
+  }
+}
+
+function logout() {
+  api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  localStorage.removeItem('axb_token');
+  localStorage.removeItem('axb_user');
+  S.token = '';
+  S.user = null;
+  S.screen = 'auth';
+  render();
+}
+
+function renderMain() {
+  const tabs = [
+    ['ai', '🤖', 'AI Chat'],
+    ['music', '🎵', 'Muzyka'],
+    ['sign', '🤟', 'Migowy'],
+    ['profile', '👤', 'Profil'],
+  ];
+  let content = '';
+  if (S.tab === 'ai') content = renderAI();
+  else if (S.tab === 'music') content = renderMusic();
+  else if (S.tab === 'sign') content = renderSign();
+  else content = renderProfile();
+  return `<div style="display:flex;flex-direction:column;height:100%">
+    <div style="flex:1;overflow-y:auto">${content}</div>
+    <div class="tabs">${tabs.map(([id, ic, lb]) => `<button class="${S.tab === id ? 'active' : ''}" onclick="S.tab='${id}';render()"><span class="icon">${ic}</span><span>${lb}</span></button>`).join('')}</div>
+  </div>`;
+}
+
+// ---------- AI CHAT ----------
+function renderAI() {
+  return `<div class="topbar"><h2>🤖 AI Chat</h2><button class="btn-ghost btn-icon" onclick="clearHistory()" title="Wyczyść">🗑️</button></div>
+    <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px">
+      ${S.aiMessages.length === 0 ? `<div class="empty"><div class="empty-icon">🤖</div><h3 style="color:var(--text)">Zapytaj o cokolwiek</h3><p>Wyszukiwarka + AI w jednym</p></div>` : ''}
+      ${S.aiMessages.map((m) => `<div class="msg ${m.role}">${m.role === 'assistant' ? formatAI(m.content) : esc(m.content)}
+        ${m.sources && m.sources.length > 0 ? `<div class="sources"><strong>Źródła:</strong>${m.sources.map((src) => `<a href="${src.url}" target="_blank" rel="noopener">📄 ${esc(src.title)}</a>`).join('')}</div>` : ''}
+      </div>`).join('')}
+      ${S.aiLoading ? `<div class="msg assistant"><div class="typing"><span></span><span></span><span></span></div></div>` : ''}
+      <div id="ai-end"></div>
+    </div>
+    <div class="input-bar"><textarea placeholder="Zapytaj AI…" oninput="S.aiInput=this.value;autoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI()}">${esc(S.aiInput)}</textarea><button class="send-btn" onclick="sendAI()" ${S.aiLoading ? 'disabled' : ''}>➤</button></div>`;
+}
+
+function formatAI(t) {
+  let h = esc(t);
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+
+async function clearHistory() {
+  if (!confirm('Wyczyścić historię?')) return;
+  // można dodać endpoint DELETE, na razie tylko lokalnie
+  S.aiMessages = [];
+  render();
+}
+
+// ---------- MUZYKA ----------
+function renderMusic() {
+  return `<div class="topbar"><h2>🎵 Generator muzyki</h2></div>
+    <div class="screen">
+      <div class="card">
+        <h3>Opisz utwór</h3>
+        <div class="field" style="margin-top:10px"><label>Styl / nastrój / gatunek</label><textarea placeholder="np. indie folk, melancholijny, akustyczna gitara" oninput="S.musicPrompt=this.value">${esc(S.musicPrompt)}</textarea></div>
+        <div class="field"><label>Tekst (opcjonalnie)</label><textarea placeholder="[Verse] ... [Chorus] ..." oninput="S.musicLyrics=this.value" style="min-height:60px">${esc(S.musicLyrics)}</textarea></div>
+        <button class="btn-primary btn-full" onclick="generateMusic()" ${S.musicLoading ? 'disabled' : ''}>${S.musicLoading ? '⏳ Generuję…' : '🎼 Generuj utwór'}</button>
+      </div>
+      ${S.lastAudioUrl ? `<div class="card"><h3>Ostatni utwór</h3><audio controls src="${S.lastAudioUrl}"></audio><a href="${S.lastAudioUrl}" download class="btn-secondary btn-full" style="margin-top:10px;text-align:center;text-decoration:none;display:block">⬇️ Pobierz MP3</a></div>` : ''}
+      ${S.musicSongs.length > 0 ? `<div class="section-title">Historia</div>${S.musicSongs.map((song) => `<div class="card"><div style="font-weight:600">${esc(song.prompt)}</div><audio controls src="/api/music/audio/${encodeURIComponent(song.audio_url)}" style="margin-top:8px"></audio></div>`).join('')}` : ''}
+    </div>`;
+}
+
+// ---------- MIGOWY ----------
+function renderSign() {
+  return `<div class="topbar"><h2>🤟 Rozpoznawanie migowego</h2></div>
+    <div class="screen">
+      <div class="alert info">MediaPipe rozpoznaje gesty dłoni lokalnie w przeglądarce. Nie wysyła obrazu na serwer.</div>
+      <div class="video-container"><video id="sign-video" autoplay muted playsinline style="${S.signActive ? '' : 'display:none'}"></video>${S.signActive ? `<div class="gesture-badge">${esc(S.gestureName) || 'Szukam dłoni…'}</div>` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted)">Kamera wyłączona</div>'}</div>
+      <button class="${S.signActive ? 'btn-danger' : 'btn-primary'} btn-full" onclick="${S.signActive ? 'stopSignRecognition()' : 'startSignRecognition()'}">${S.signActive ? '⏹ Zatrzymaj' : '▶️ Włącz kamerę'}</button>
+      ${S.signHistory.length > 0 ? `<div class="section-title">Rozpoznane gesty</div>${S.signHistory.map((g) => `<div class="card" style="padding:12px 16px"><span style="font-weight:600">${esc(g.text)}</span><span class="caption" style="float:right">${new Date(g.ts).toLocaleTimeString('pl')}</span></div>`).join('')}` : ''}
+    </div>`;
+}
+
+// ---------- PROFIL ----------
+function renderProfile() {
+  const u = S.user || {};
+  return `<div class="screen center">
+    <div class="avatar large">${esc((u.displayName || '?')[0])}</div>
+    <h2>${esc(u.displayName || '')}</h2>
+    <p class="caption">${esc(u.email || '')}</p>
+    <div style="width:100%;margin-top:24px">
+      <div class="list-item" onclick="logout()" style="padding:14px 16px;border-radius:14px;background:var(--surface2);display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px"><span style="font-size:20px">🚪</span><span style="flex:1">Wyloguj</span></div>
+    </div>
+    <p class="caption" style="margin-top:24px">AXBridge v2.0 · Cloudflare Workers AI</p>
+  </div>`;
+}
+
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+
+// ---------- start ----------
+if (S.token && S.user) {
+  S.screen = 'main';
+  render();
+  Promise.all([loadHistory(), loadSongs()]);
+} else {
+  render();
+}
+
+// eksponuj funkcje do onclick
+Object.assign(window, {
+  S, render, doRegister, doLogin, logout, sendAI, generateMusic,
+  startSignRecognition, stopSignRecognition, clearHistory, autoResize, esc, toast,
 });
-pad.addEventListener("keydown",e=>{
-  if(e.key==="."){cur+=".";}else if(e.key==="-"){cur+="-";}else if(e.key==="/"){cur+="/";}
-  else if(e.key===" "){cur+=" ";}else if(e.key==="Backspace"){cur=cur.slice(0,-1);}else return;
-  e.preventDefault();draw();});
-function decode(m){return m.split(" ").filter(Boolean).map(w=>w.split("/").map(l=>R[l]||"?").join("")).join(" ");}
-$("#btnMorseSend").onclick=()=>{const t=decode(cur);if(!t){toast("Nadaj najpierw znaki.","warn");return;}
-  send(t+" · [Morse]","morse");cur="";lastLearn="";draw();};
-$("#btnMorseVib").onclick=()=>{vib(cur.split("").map(c=>c==="."?60:+S.dash).flatMap(p=>[p,90]));toast("Nadano wibracją.","ok");};
-$("#btnMorseClear").onclick=()=>{cur="";lastLearn="";draw();};
-function morseVib(t){const seq=[];t.toLowerCase().split("").forEach(ch=>{const c=M[ch];
-  if(!c){seq.push(300,150);return;}c.split("").forEach((s,i)=>{if(i)seq.push(90);seq.push(s==="."?60:+S.dash);});seq.push(210);});
-  vib(seq);}
-$("#btnTxt2MorseVib").onclick=()=>{const t=$("#txtIn").value;if(!t){toast("Wpisz tekst.","warn");return;}morseVib(t);toast("Wysłano wibracją.","ok");};
-let AC=null;
-$("#btnTxt2MorseOut").onclick=()=>{
-  const t=$("#txtIn").value;if(!t){toast("Wpisz tekst.","warn");return;}
-  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-  const d=1200/(+S.wpm);let t0=AC.currentTime+.1;
-  t.toLowerCase().split("").forEach(ch=>{const c=M[ch];if(!c)return;
-    c.split("").forEach(s=>{const len=s==="."?d:3*d;
-      const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=600;
-      o.connect(g);g.connect(AC.destination);
-      g.gain.setValueAtTime(.13,t0);g.gain.setValueAtTime(0,t0+len);
-      o.start(t0);o.stop(t0+len);t0+=len+d;});});
-  toast("Nadano dźwiękiem.","ok");};
-$("#wpm").onchange=e=>{S.wpm=+e.target.value;save();};
-$("#dashMs").onchange=e=>{S.dash=+e.target.value;save();};
-$("#swLearn").onclick=e=>{const sw=e.currentTarget;const on=sw.getAttribute("aria-checked")!=="true";
-  sw.setAttribute("aria-checked",on);S.learn=on;save();
-  toast(on?"Tryb nauki: litery czytane TTS.":"Tryb nauki wyłączony.","ok");};
-/* MIG */
-$$("#signCands [data-sign]").forEach(b=>b.onclick=()=>{
-  const conf=70+Math.floor(Math.random()*29);
-  const ok=confirm("Rozpoznano (pewność "+conf+"%): „"+b.dataset.sign+"”\n\nAI proponuje — Ty decydujesz. Wysłać?");
-  if(ok){send(b.dataset.sign,"sign");toast("Wysłano po potwierdzeniu.","ok");logEvent("sign",b.dataset.sign);}
-});
-$("#btnRecSign").onclick=()=>toast("Nagrywanie znaku w aplikacji mobilnej (aparat). Zapis lokalny.","warn");
-/* MUZYKA */
-const VIB={s:[400,150,400,300,400],s2:[120,80,120,200,240,80,120],f:[60,60,60,60,60,60,200,60],w:[700,400,250,400,700]};
-$$(".mood").forEach(b=>b.onclick=()=>{
-  vib(VIB[b.dataset.vib].slice());
-  send("🎵 "+b.dataset.mood,"music");
-  toast("Wysłano reakcję muzyczną — odbiorca czuje rytm haptyką.","ok");
-  logEvent("muzyka",b.dataset.mood);
-});
-$("#btnSendSong").onclick=()=>{
-  const t=$("#songIn").value.trim();
-  if(!t){toast("Podaj tytuł lub wykonawcę.","warn");return;}
-  send("🎵 Polecam: "+t,"music");toast("Wysłano fragment.","ok");};
-let beat=[],beatOn=false;
-$("#btnBeat").onclick=function(){
-  beatOn=!beatOn;
-  this.textContent=beatOn?"■ Zakończ rytm":"🥁 Nagraj rytm dotykiem";
-  if(beatOn){beat=[];this.addEventListener("pointerdown",beatTap);}
-  else{this.removeEventListener("pointerdown",beatTap);
-    if(beat.length<2){toast("Rytm za krótki — dotknij kilkukrotnie.","warn");return;}
-    const gaps=[];for(let i=1;i<beat.length;i++)gaps.push(Math.min(800,beat[i]-beat[i-1]));
-    const pat=[];gaps.forEach(g=>{pat.push(70);pat.push(g);});
-    vib(pat);
-    send("🥁 Rytm: "+gaps.length+" uderzeń","music");
-    toast("Rytm wysłany — odbiorca czuje Twój puls.","ok");logEvent("muzyka","rytm");}
-};
-function beatTap(){beat.push(Date.now());}
-(function(){const el=$("#vibPrev");for(let i=0;i<9;i++){const s=document.createElement("i");
-  s.style.animationDelay=(i*.09)+"s";el.appendChild(s);}})();
-/* SOS */
-let hold=null,armed=false,cd=null;
-const sos=$("#sosBtn");
-function startHold(e){e.preventDefault();hold=setTimeout(arm,3000);}
-function arm(){armed=true;sos.classList.add("armed");$("#sosLbl").innerHTML="UZBROJONY<br>POTWIERDŹ ≤ 5 s";
-  let t=5.0;$("#sosTimer").hidden=false;vib([200,100,200]);
-  cd=setInterval(()=>{t-=.1;$("#sosTimer").textContent=t.toFixed(1);if(t<=0){clearInterval(cd);fire();}},100);}
-function endHold(){if(!armed)clearTimeout(hold);}
-function fire(){
-  $("#sosLbl").innerHTML="ALARM<br>WYSŁANY";sos.disabled=true;$("#sosCancel").classList.remove("hidden");
-  $("#sosTimer").hidden=true;const min=S.locMin;
-  logEvent("alarm","aktywacja; lokalizacja "+min+" min; "+S.sos.length+" kontaktów");
-  toast("ALARM wysłany do "+S.sos.length+" kontaktów (push + SMS). Lokalizacja: "+min+" min.","ok");
-  vib([300,100,300,100,500]);
-  setTimeout(()=>sosReset(true),min*60*1000);
-}
-function sosReset(silent){
-  armed=false;clearInterval(cd);sos.disabled=false;sos.classList.remove("armed");
-  $("#sosLbl").innerHTML="PRZYTRZYMAJ<br>3 s";$("#sosTimer").hidden=true;$("#sosCancel").classList.add("hidden");
-  if(!silent){toast("Alarm anulowany. Lokalizacja ukryta natychmiast.","warn");logEvent("alarm","anulowano");}
-}
-sos.addEventListener("pointerdown",startHold);
-sos.addEventListener("pointerup",endHold);sos.addEventListener("pointercancel",endHold);
-$("#sosCancel").onclick=()=>sosReset(false);
-$$("#p-sos [data-loc]").forEach(b=>b.onclick=()=>{
-  $$("#p-sos [data-loc]").forEach(x=>x.setAttribute("aria-pressed","false"));
-  b.setAttribute("aria-pressed","true");S.locMin=+b.dataset.loc;save();});
-function renderSos(){
-  const el=$("#sosContacts");el.innerHTML="";
-  S.sos.forEach((c,i)=>{const d=document.createElement("div");d.className="row";
-    d.innerHTML="<div><b>"+c.name+"</b><small>"+c.chan+(c.ok?" · test OK":"")+"</small></div>";
-    const del=document.createElement("button");del.className="btn";del.style.padding="8px 14px";del.textContent="Usuń";
-    del.onclick=()=>{S.sos.splice(i,1);save();renderSos();};d.appendChild(del);el.appendChild(d);});
-}
-$("#btnAddSos").onclick=()=>{const n=prompt("Nazwa kontaktu alarmowego:");if(!n)return;
-  S.sos.push({name:n,chan:"push + SMS",ok:false});save();renderSos();toast("Dodano. Uruchom test dostarczalności.","warn");};
-/* PRIVACY */
-function bindSwitch(id,key,onChange){
-  const el=$(id);
-  el.setAttribute("aria-checked",String(!!S[key]));
-  el.onclick=()=>{const on=el.getAttribute("aria-checked")!=="true";
-    el.setAttribute("aria-checked",on);S[key]=on;save();
-    logEvent("zgoda",key+" = "+on);
-    if(onChange)onChange(on);
-    toast(key==="cloud"?(on?"Zgoda zapisana (CONSENT RECORD). Odwołasz ją w każdej chwili.":"Przetwarzanie wyłącznie lokalne."):(on?"Włączono.":"Wyłączono."),"ok");};
-}
-$("#btnExport").onclick=()=>{
-  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="axbridge-export.json";a.click();
-  logEvent("eksport","dane");};
-$("#btnDelete").onclick=()=>{
-  if(!confirm("Usunąć konto i WSZYSTKIE dane lokalne? Nie można cofnąć."))return;
-  if(!confirm("Na pewno? Konto usunięte po okresie ochronnym 7 dni."))return;
-  localStorage.removeItem(LS);logEvent("usuwanie","konto");
-  toast("Zlecono usunięcie. Okres ochronny: 7 dni.","warn");};
-/* PROFILE */
-function applyProfile(){
-  document.documentElement.style.setProperty("--fs",S.fontScale+"px");
-  document.body.classList.toggle("reduce-motion",S.rm);
-  document.body.classList.toggle("hc2",S.hc);
-  try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)document.body.classList.add("reduce-motion");}catch(_){}
-}
-bindSwitch("#swCloud","cloud");bindSwitch("#swAuto","autoSend");bindSwitch("#swBio","bio");
-bindSwitch("#swSensitive","sensitive");bindSwitch("#swTrain","train");
-bindSwitch("#swRM","rm",applyProfile);bindSwitch("#swHC","hc",applyProfile);bindSwitch("#swSimple","simple");
-$("#inCh").value=S.inCh;$("#outCh").value=S.outCh;$("#fontScale").value=S.fontScale;
-$("#inCh").onchange=e=>{S.inCh=e.target.value;save();};
-$("#outCh").onchange=e=>{S.outCh=e.target.value;save();};
-$("#fontScale").onchange=e=>{S.fontScale=+e.target.value;save();applyProfile();};
-const hcStyle=document.createElement("style");
-hcStyle.textContent="body.hc2{--bg:#000;--bg-elev:#0c0c0e;--card:rgba(255,255,255,.07);--card-hi:rgba(255,255,255,.12);--stroke:rgba(255,255,255,.18);--stroke-hi:rgba(255,255,255,.3);--txt:#fff;--txt-2:#d5daе3;--txt-2:#d5dae3;--txt-3:#b0b6c2;--accent:#409cff}";
-document.head.appendChild(hcStyle);
-/* LOG */
-function renderLog(){
-  const el=$("#logList");el.innerHTML=S.log.length?"":"<p class='sub'>Brak zdarzeń.</p>";
-  S.log.forEach(l=>{const d=document.createElement("div");d.className="row";
-    d.innerHTML="<div><b>"+l.kind+"</b><small>"+l.detail+"</small></div><small style='color:var(--txt-3);white-space:nowrap'>"+new Date(l.t).toLocaleString("pl")+"</small>";
-    el.appendChild(d);});
-}
-$("#btnLogExport").onclick=()=>{
-  const blob=new Blob([JSON.stringify(S.log,null,2)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="axbridge-dziennik.json";a.click();};
-/* INIT */
-$("#whoami").textContent=S.name||"";
-applyProfile();net();renderConvs();renderChat();renderSos();
-if(S.name)$("#onb").classList.add("hidden");
 </script>
 </body>
 </html>

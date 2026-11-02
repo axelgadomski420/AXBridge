@@ -36,7 +36,7 @@ enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Target platform: web | react | ios | android | workers
+        /// Target platform: web (DOM) | react | ios | android | workers
         #[arg(short, long, default_value = "web")]
         target: String,
 

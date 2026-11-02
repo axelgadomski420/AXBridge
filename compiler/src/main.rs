@@ -1,7 +1,4 @@
-//! AXCode Ultra Compiler (axc)
-//! Production-grade compiler for AXBridge-class applications.
-//! Supports: accessibility channels, music, live translation, TikTak, personas,
-//! multi-provider AI, Cloudflare Workers (D1/R2/KV/AI/Queue), iOS, Android, Web.
+//! AXCode Ultra Compiler (axc) — produkcyjny kompilator dla aplikacji klasy AXBridge.
 
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -36,23 +33,19 @@ struct Cli {
 enum Commands {
     /// Compile an .ax file
     Build {
-        /// Path to the main .ax file
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Target platform: web | ios | android | workers
+        /// Target platform: web | react | ios | android | workers
         #[arg(short, long, default_value = "web")]
         target: String,
 
-        /// Output directory
         #[arg(short, long, default_value = "./dist")]
         out: PathBuf,
 
-        /// Enable release optimizations
         #[arg(long)]
         release: bool,
 
-        /// Verbose diagnostics
         #[arg(short, long)]
         verbose: bool,
 
@@ -61,7 +54,7 @@ enum Commands {
         allow_a11y_violations: bool,
     },
 
-    /// Run in development mode with hot reload
+    /// Run in development mode with rebuild on change
     Run {
         #[arg(value_name = "FILE")]
         file: PathBuf,
@@ -75,7 +68,6 @@ enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Emit the accessibility report as JSON
         #[arg(long)]
         json: bool,
     },
@@ -85,7 +77,6 @@ enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Emit the report as JSON
         #[arg(long)]
         json: bool,
     },
@@ -95,14 +86,12 @@ enum Commands {
         #[arg(value_name = "PERSONA")]
         persona: String,
 
-        /// Emit the plan as JSON
         #[arg(long)]
         json: bool,
     },
 
     /// Print the multi-channel capability matrix
     Channels {
-        /// Emit the matrix as JSON
         #[arg(long)]
         json: bool,
     },
@@ -159,7 +148,7 @@ fn main() -> AxResult<()> {
             if !outcome.unsupported.is_empty() {
                 println!("Unsupported nodes: {}", outcome.unsupported.join(", "));
             }
-            println!("✓ {} artefacts written to {}", outcome.artefacts, out.display());
+            println!("✓ {} artefaktów zapisano w {}", outcome.artefacts, out.display());
         }
         Commands::Run { file, target } => {
             info!("Starting dev watcher for {}", file.display());
@@ -175,11 +164,7 @@ fn main() -> AxResult<()> {
                 print!("{}", report.render());
             }
             if report.is_blocking() {
-                return Err(error::AxError::semantic(
-                    "Krytyczne błędy dostępności".into(),
-                    0,
-                    0,
-                ));
+                return Err(error::AxError::semantic("Krytyczne błędy dostępności".into(), 0, 0));
             }
             println!("✓ Bez błędów krytycznych");
         }
@@ -200,10 +185,16 @@ fn main() -> AxResult<()> {
                 println!("Persona: {}", plan.persona);
                 println!("  inbound:  {}", plan.inbound.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(", "));
                 println!("  outbound: {}", plan.outbound.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(", "));
-                println!("  large targets: {}, reduce motion: {}, max actions: {}, announce: {}", plan.large_targets, plan.reduce_motion, plan.max_actions, plan.announce_changes);
+                println!(
+                    "  large targets: {}, reduce motion: {}, max actions: {}, announce: {}",
+                    plan.large_targets, plan.reduce_motion, plan.max_actions, plan.announce_changes
+                );
                 for channel in plan.inbound.iter().chain(plan.outbound.iter()) {
                     let fallback = channel.fallback.clone().unwrap_or_else(|| "-".into());
-                    println!("    {} confirm={} offline={} fallback={}", channel.id, channel.requires_confirmation, channel.offline_capable, fallback);
+                    println!(
+                        "    {} confirm={} offline={} fallback={}",
+                        channel.id, channel.requires_confirmation, channel.offline_capable, fallback
+                    );
                 }
             }
         }
@@ -213,7 +204,10 @@ fn main() -> AxResult<()> {
                 println!("{}", serde_json::to_string_pretty(&matrix).unwrap_or_else(|_| "{}".into()));
             } else {
                 for row in &matrix {
-                    println!("{:>10}  {:>11}  confirms={:<5} offline={:<5} redundant={}", row.channel, row.kind, row.requires_confirmation, row.offline_capable, row.redundant_representation);
+                    println!(
+                        "{:>10}  {:>14}  confirms={:<5} offline={:<5} redundant={}",
+                        row.channel, row.kind, row.requires_confirmation, row.offline_capable, row.redundant_representation
+                    );
                 }
             }
         }
@@ -226,7 +220,8 @@ fn main() -> AxResult<()> {
         Commands::Workers { file, out } => {
             info!("Generating Cloudflare Workers backend…");
             let ir = load(&file)?;
-            codegen::workers::generate(&ir, &out)?;
+            let report = codegen::workers::emit(&ir, &out, false)?;
+            println!("✓ {} plików zapisano w {}", report.files, out.display());
         }
     }
 

@@ -2,9 +2,9 @@ use crate::axir::Ir;
 use crate::error::AxResult;
 use std::path::Path;
 
+pub mod dom;
 pub mod kotlin;
 pub mod swift;
-pub mod typescript;
 pub mod web;
 pub mod workers;
 
@@ -15,13 +15,18 @@ pub struct BuildOutcome {
     pub unsupported: Vec<String>,
 }
 
-pub fn build_ir(ir: &Ir, target: &str, out: &Path, _release: bool, verbose: bool) -> AxResult<BuildOutcome> {
+pub fn build_ir(ir: &Ir, target: &str, out: &Path, release: bool, verbose: bool) -> AxResult<BuildOutcome> {
     std::fs::create_dir_all(out)?;
     let mut outcome = BuildOutcome::default();
     match target {
-        "web" | "ts" | "typescript" => {
+        "web" | "dom" => {
+            let report = dom::emit(ir, out, verbose)?;
+            outcome.artefacts = report.files;
+            outcome.unsupported = report.unsupported;
+        }
+        "react" | "ts" | "typescript" => {
             let report = web::emit(ir, out, verbose)?;
-            outcome.artefacts = 3;
+            outcome.artefacts = report.files;
             outcome.unsupported = report.unsupported;
         }
         "ios" | "swift" => {

@@ -1,28 +1,32 @@
 //! AXCode Ultra Compiler (axc)
 //! Production-grade compiler for AXBridge-class applications.
-//! Supports: music, live translation, TikTak, personas, multi-provider AI,
-//! Cloudflare Workers (D1/R2/KV/AI/Queue), iOS, Android, Web.
+//! Supports: accessibility channels, music, live translation, TikTak, personas,
+//! multi-provider AI, Cloudflare Workers (D1/R2/KV/AI/Queue), iOS, Android, Web.
 
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-mod lexer;
-mod parser;
-mod semantic;
+mod a11y;
+mod ai;
+mod ast;
 mod axir;
-mod optimizer;
 mod codegen;
 mod error;
+mod lexer;
+mod message;
+mod optimizer;
+mod parser;
 mod runtime;
+mod semantic;
 
 use error::AxResult;
 
 #[derive(Parser)]
 #[command(name = "axc")]
 #[command(about = "AXCode Ultra Compiler – one file → every platform", long_about = None)]
-#[command(version = "0.9.0-ultra")]
+#[command(version = "2.0.0")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -36,7 +40,7 @@ enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Target platform
+        /// Target platform: web | ios | android | workers
         #[arg(short, long, default_value = "web")]
         target: String,
 
@@ -51,6 +55,10 @@ enum Commands {
         /// Verbose diagnostics
         #[arg(short, long)]
         verbose: bool,
+
+        /// Continue the build despite critical accessibility findings
+        #[arg(long)]
+        allow_a11y_violations: bool,
     },
 
     /// Run in development mode with hot reload
@@ -62,10 +70,41 @@ enum Commands {
         target: String,
     },
 
-    /// Type-check and lint without generating code
+    /// Type-check, lint and audit accessibility without generating code
     Check {
         #[arg(value_name = "FILE")]
         file: PathBuf,
+
+        /// Emit the accessibility report as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print the accessibility report for an .ax file
+    Audit {
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+
+        /// Emit the report as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print the adaptation plan for a persona (deaf, blind, deafBlind, motor, …)
+    Persona {
+        #[arg(value_name = "PERSONA")]
+        persona: String,
+
+        /// Emit the plan as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print the multi-channel capability matrix
+    Channels {
+        /// Emit the matrix as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Format .ax source
@@ -87,6 +126,13 @@ enum Commands {
     },
 }
 
+fn load(file: &Path) -> AxResult<axir::Ir> {
+    let source = std::fs::read_to_string(file)?;
+    let program = parser::Parser::new(&source)?.parse_program()?;
+    semantic::check_program(&program)?;
+    Ok(axir::lower(&program))
+}
+
 fn main() -> AxResult<()> {
     let cli = Cli::parse();
 
@@ -96,20 +142,82 @@ fn main() -> AxResult<()> {
     tracing::subscriber::set_global_default(subscriber).ok();
 
     match cli.command {
-        Commands::Build { file, target, out, release, verbose } => {
-            info!("AXCode Ultra Compiler – building {} for {}", file.display(), target);
-            codegen::build(&file, &target, &out, release, verbose)?;
+        Commands::Build { file, target, out, release, verbose, allow_a11y_violations } => {
+            info!("AXCode — building {} for {}", file.display(), target);
+            let ir = load(&file)?;
+            let report = a11y::AccessibilityReport::from_issues(a11y::audit::audit(&ir));
+            if report.is_blocking() && !allow_a11y_violations {
+                eprint!("{}", report.render());
+                return Err(error::AxError::semantic(
+                    "Build zatrzymany: krytyczne błędy dostępności".into(),
+                    0,
+                    0,
+                ));
+            }
+            let outcome = codegen::build_ir(&ir, &target, &out, release, verbose)?;
+            println!("Accessibility: {} critical, {} warning, {} info", report.critical, report.warning, report.info);
+            if !outcome.unsupported.is_empty() {
+                println!("Unsupported nodes: {}", outcome.unsupported.join(", "));
+            }
+            println!("✓ {} artefacts written to {}", outcome.artefacts, out.display());
         }
         Commands::Run { file, target } => {
-            info!("Starting hot-reload dev server for {}", file.display());
+            info!("Starting dev watcher for {}", file.display());
             runtime::dev_server::start(&file, &target)?;
         }
-        Commands::Check { file } => {
+        Commands::Check { file, json } => {
             semantic::check(&file)?;
-            println!("✓ No errors found");
+            let ir = load(&file)?;
+            let report = a11y::AccessibilityReport::from_issues(a11y::audit::audit(&ir));
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into()));
+            } else {
+                print!("{}", report.render());
+            }
+            if report.is_blocking() {
+                return Err(error::AxError::semantic(
+                    "Krytyczne błędy dostępności".into(),
+                    0,
+                    0,
+                ));
+            }
+            println!("✓ Bez błędów krytycznych");
+        }
+        Commands::Audit { file, json } => {
+            let ir = load(&file)?;
+            let report = a11y::AccessibilityReport::from_issues(a11y::audit::audit(&ir));
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into()));
+            } else {
+                print!("{}", report.render());
+            }
+        }
+        Commands::Persona { persona, json } => {
+            let plan = a11y::plan_for(&persona);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&plan).unwrap_or_else(|_| "{}".into()));
+            } else {
+                println!("Persona: {}", plan.persona);
+                println!("  inbound:  {}", plan.inbound.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(", "));
+                println!("  outbound: {}", plan.outbound.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(", "));
+                println!("  large targets: {}, reduce motion: {}, max actions: {}, announce: {}", plan.large_targets, plan.reduce_motion, plan.max_actions, plan.announce_changes);
+                for channel in plan.inbound.iter().chain(plan.outbound.iter()) {
+                    let fallback = channel.fallback.clone().unwrap_or_else(|| "-".into());
+                    println!("    {} confirm={} offline={} fallback={}", channel.id, channel.requires_confirmation, channel.offline_capable, fallback);
+                }
+            }
+        }
+        Commands::Channels { json } => {
+            let matrix = message::capability_matrix();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&matrix).unwrap_or_else(|_| "{}".into()));
+            } else {
+                for row in &matrix {
+                    println!("{:>10}  {:>11}  confirms={:<5} offline={:<5} redundant={}", row.channel, row.kind, row.requires_confirmation, row.offline_capable, row.redundant_representation);
+                }
+            }
         }
         Commands::Format { file } => {
-            // placeholder – real formatter later
             println!("Formatting {} …", file.display());
         }
         Commands::Doctor {} => {
@@ -117,7 +225,8 @@ fn main() -> AxResult<()> {
         }
         Commands::Workers { file, out } => {
             info!("Generating Cloudflare Workers backend…");
-            codegen::workers::generate(&file, &out)?;
+            let ir = load(&file)?;
+            codegen::workers::generate(&ir, &out)?;
         }
     }
 

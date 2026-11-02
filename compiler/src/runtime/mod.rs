@@ -1,2 +1,2 @@
-pub mod dev_server;
 pub mod doctor;
+pub mod dev_server;

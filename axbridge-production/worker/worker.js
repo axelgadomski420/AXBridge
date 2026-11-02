@@ -1,183 +1,80 @@
-/**
- * AXBridge Ultra – Cloudflare Worker (production)
- * Admin: axelgadomski@icloud.com
- * Bindings: AL_DB, AL_KV, AL_BUCKET, AL_QUEUE (optional), AI, ASSETS
- */
+import { empty, error, fail, headers, json } from "./core.js";
+import { accessibility, contacts, deleteAccount, exportData, login, logout, me, refresh, register, updateMe } from "./auth.js";
+import { conversations, emergency, media, providers } from "./comms.js";
+import { follow, posts, profile } from "./social.js";
+import { admin, communities, music, tiktak, translate } from "./social_legacy.js";
+
+const routes = [
+  ["POST",/^\/api\/auth\/register$/,(q,e)=>register(q,e)],
+  ["POST",/^\/api\/auth\/login$/,(q,e)=>login(q,e)],
+  ["POST",/^\/api\/auth\/refresh$/,(q,e)=>refresh(q,e)],
+  ["POST",/^\/api\/auth\/logout$/,logout],
+  ["GET",/^\/api\/me$/,me],["PATCH",/^\/api\/me$/,updateMe],["DELETE",/^\/api\/me$/,deleteAccount],
+  ["GET",/^\/api\/me\/export$/,exportData],["GET",/^\/api\/me\/accessibility$/,accessibility],["PUT",/^\/api\/me\/accessibility$/,accessibility],
+  ["GET",/^\/api\/contacts$/,contacts],["POST",/^\/api\/contacts$/,contacts],["PATCH",/^\/api\/contacts\/([^/]+)$/,contacts],["DELETE",/^\/api\/contacts\/([^/]+)$/,contacts],
+  ["GET",/^\/api\/conversations$/,conversations],["POST",/^\/api\/conversations$/,conversations],
+  ["GET",/^\/api\/conversations\/([^/]+)\/messages$/,conversations],["POST",/^\/api\/conversations\/([^/]+)\/messages$/,conversations],
+  ["POST",/^\/api\/conversations\/([^/]+)\/messages\/receipts$/,conversations],
+  ["PATCH",/^\/api\/conversations\/([^/]+)\/messages\/([^/]+)$/,conversations],["DELETE",/^\/api\/conversations\/([^/]+)\/messages\/([^/]+)$/,conversations],
+  ["PATCH",/^\/api\/conversations\/([^/]+)$/,conversations],["DELETE",/^\/api\/conversations\/([^/]+)$/,conversations],["POST",/^\/api\/conversations\/([^/]+)\/participants$/,conversations],
+  ["POST",/^\/api\/media$/,media],["GET",/^\/api\/media\/(.+)$/,media],["DELETE",/^\/api\/media\/(.+)$/,media],
+  ["GET",/^\/api\/emergency$/,emergency],["POST",/^\/api\/emergency$/,emergency],["DELETE",/^\/api\/emergency\/([^/]+)$/,emergency],
+  ["GET",/^\/api\/providers$/,providers],["POST",/^\/api\/providers$/,providers],["PATCH",/^\/api\/providers\/([^/]+)$/,providers],["DELETE",/^\/api\/providers\/([^/]+)$/,providers],
+  ["GET",/^\/api\/me\/profile$/,profile],["PUT",/^\/api\/me\/profile$/,profile],
+  ["GET",/^\/api\/profiles\/([A-Za-z0-9_.]+)$/,profile],
+  ["PUT",/^\/api\/profiles\/([A-Za-z0-9_.]+)\/follow$/,follow],["DELETE",/^\/api\/profiles\/([A-Za-z0-9_.]+)\/follow$/,follow],
+  ["GET",/^\/api\/posts$/,posts],["POST",/^\/api\/posts$/,posts],
+  ["GET",/^\/api\/posts\/([^/]+)$/,posts],["DELETE",/^\/api\/posts\/([^/]+)$/,posts],
+  ["PUT",/^\/api\/posts\/([^/]+)\/reaction$/,posts],["DELETE",/^\/api\/posts\/([^/]+)\/reaction$/,posts],
+  ["GET",/^\/api\/posts\/([^/]+)\/comments$/,posts],["POST",/^\/api\/posts\/([^/]+)\/comments$/,posts],
+  ["POST",/^\/api\/posts\/([^/]+)\/views$/,posts],["POST",/^\/api\/posts\/([^/]+)\/report$/,posts],
+  ["GET",/^\/api\/tiktak$/,tiktak],["POST",/^\/api\/tiktak$/,tiktak],
+  ["POST",/^\/api\/tiktak\/([^/]+)\/(like|comments|report|share)$/,tiktak],["DELETE",/^\/api\/tiktak\/([^/]+)\/like$/,tiktak],["GET",/^\/api\/tiktak\/([^/]+)\/comments$/,tiktak],["DELETE",/^\/api\/tiktak\/([^/]+)\/comments\/([^/]+)$/,tiktak],["DELETE",/^\/api\/tiktak\/([^/]+)$/,tiktak],
+  ["GET",/^\/api\/communities$/,communities],["POST",/^\/api\/communities$/,communities],["GET",/^\/api\/communities\/([^/]+)$/,communities],
+  ["POST",/^\/api\/communities\/([^/]+)\/(join|leave|invite)$/,communities],
+  ["GET",/^\/api\/communities\/([^/]+)\/posts$/,communities],["POST",/^\/api\/communities\/([^/]+)\/posts$/,communities],
+  ["POST",/^\/api\/communities\/([^/]+)\/posts\/([^/]+)\/(comments|like|report)$/,communities],["DELETE",/^\/api\/communities\/([^/]+)\/posts\/([^/]+)\/like$/,communities],["GET",/^\/api\/communities\/([^/]+)\/posts\/([^/]+)\/comments$/,communities],["DELETE",/^\/api\/communities\/([^/]+)\/posts\/([^/]+)\/comments\/([^/]+)$/,communities],["DELETE",/^\/api\/communities\/([^/]+)\/posts\/([^/]+)$/,communities],
+  ["GET",/^\/api\/music$/,music],["POST",/^\/api\/music$/,music],["DELETE",/^\/api\/music\/([^/]+)$/,music],
+  ["POST",/^\/api\/translate$/,translate],
+  ["GET",/^\/api\/admin\/(stats|reports|audit)$/,admin],["PATCH",/^\/api\/admin\/(reports)\/([^/]+)$/,admin]
+];
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: cors() });
-    }
-
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(env, request) });
     try {
-      // Admin hard-guard
-      if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
-        const email = request.headers.get("X-User-Email") || "";
-        if (email !== "axelgadomski@icloud.com") {
-          return json({ error: "Admin access denied" }, 403);
-        }
+      const path = new URL(request.url).pathname;
+      if (path === "/api/health") return json(env, request, { status: "ok", service: "axbridge", version: "3.0.0", apiVersion: "v1" });
+      for (const [method, pattern, handler] of routes) {
+        const match = path.match(pattern);
+        if (match && method === request.method) return await handler(request, env, match.slice(1));
       }
-
-      if (path === "/api/health") {
-        return json({ status: "ok", service: "axbridge-ultra", version: "1.2.0" });
-      }
-
-      if (path === "/api/translate" && request.method === "POST") {
-        return await translate(request, env);
-      }
-
-      if (path === "/api/music/generate" && request.method === "POST") {
-        return await queueMusic(request, env);
-      }
-
-      if (path.startsWith("/api/tiktak")) {
-        return await tiktak(request, env, path);
-      }
-
-      if (path.startsWith("/api/messages")) {
-        return await messages(request, env);
-      }
-
-      if (path === "/api/upload" && request.method === "POST") {
-        return await upload(request, env);
-      }
-
-      if (path.startsWith("/api/admin")) {
-        return await admin(request, env, path);
-      }
-
-      // Static
-      if (env.ASSETS) {
-        return env.ASSETS.fetch(request);
-      }
-
-      return json({ error: "Not found" }, 404);
+      if (path.startsWith("/api/")) fail(404, "NOT_FOUND", "Endpoint not found");
+      if (env.ASSETS) return env.ASSETS.fetch(request);
+      fail(404, "NOT_FOUND", "Not found");
     } catch (e) {
-      console.error(e);
-      return json({ error: "Internal Server Error", detail: String(e) }, 500);
+      return error(env, request, e);
     }
   },
-
   async queue(batch, env) {
-    for (const msg of batch.messages) {
+    for (const message of batch.messages) {
       try {
-        const { prompt, mood, provider, userId } = msg.body;
-        console.log(`[music] generating via ${provider}: ${prompt}`);
-        // Tutaj wywołanie Suno / Puter / HF
-        // Wynik → R2 + wpis w music_cache
-        msg.ack();
-      } catch (err) {
-        console.error("Queue error", err);
-        msg.retry();
+        if (message.body.type !== "emergency") throw new Error("Unsupported queue message");
+        const { eventId, recipients } = message.body;
+        const event = await env.AL_DB.prepare("SELECT * FROM emergency_events WHERE id=? AND status='active'").bind(eventId).first();
+        if (event) for (const userId of recipients) await env.AL_DB.prepare("INSERT INTO notifications(id,user_id,type,resource_id,payload,created_at) VALUES(?,?,'emergency',?,?,?)").bind(crypto.randomUUID(), userId, eventId, JSON.stringify({ expiresAt: event.expires_at }), new Date().toISOString()).run();
+        message.ack();
+      } catch (e) {
+        message.retry({ delaySeconds: 30 });
       }
     }
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(Promise.all([
+      env.AL_DB.prepare("DELETE FROM sessions WHERE refresh_expires_at<? OR revoked_at<?").bind(new Date().toISOString(), new Date(Date.now() - 2592000000).toISOString()).run(),
+      env.AL_DB.prepare("UPDATE emergency_events SET status='expired',location_shared=0,latitude=NULL,longitude=NULL WHERE status='active' AND expires_at<?").bind(new Date().toISOString()).run(),
+      env.AL_DB.prepare("DELETE FROM rate_limits WHERE expires_at<?").bind(new Date().toISOString()).run(),
+      env.AL_DB.prepare("UPDATE posts SET status='archived' WHERE status='published' AND created_at < ?").bind(new Date(Date.now() - 7776000000).toISOString()).run()
+    ]));
   }
 };
-
-function cors() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-User-Email, X-Device-Id",
-  };
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json", ...cors() },
-  });
-}
-
-async function translate(request, env) {
-  const { text, targetLang = "en", sourceLang = "auto" } = await request.json();
-  const key = `tr:${sourceLang}:${targetLang}:${simpleHash(text)}`;
-  const cached = await env.AL_KV.get(key);
-  if (cached) return json({ original: text, translated: cached, cached: true });
-
-  // Placeholder – podmień na prawdziwy provider (DeepL / Puter / Workers AI)
-  const translated = targetLang === "en" ? `[EN] ${text}` : `[PL] ${text}`;
-  await env.AL_KV.put(key, translated, { expirationTtl: 604800 });
-  return json({ original: text, translated, cached: false });
-}
-
-async function queueMusic(request, env) {
-  const body = await request.json();
-  if (!env.AL_QUEUE) {
-    // Kolejka nie jest zbindowana – nie wywalamy requestu, tylko oznaczamy status
-    return json({ status: "queued-local", note: "AL_QUEUE not bound; music marked without queue processing" });
-  }
-  await env.AL_QUEUE.send({
-    prompt: body.prompt,
-    mood: body.mood || "happy",
-    provider: body.provider || "suno",
-    userId: body.userId || null,
-  });
-  return json({ status: "queued" });
-}
-
-async function tiktak(request, env, path) {
-  if (request.method === "GET") {
-    const { results } = await env.AL_DB.prepare(
-      `SELECT id, author_id, caption, media_url, media_type, is_funny, likes, comments, created_at
-       FROM tiktak_posts ORDER BY created_at DESC LIMIT 40`
-    ).all();
-    return json({ posts: results || [] });
-  }
-
-  if (request.method === "POST") {
-    const b = await request.json();
-    const id = crypto.randomUUID();
-    await env.AL_DB.prepare(
-      `INSERT INTO tiktak_posts (id, author_id, caption, media_url, media_type, is_funny, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, b.authorId, b.caption, b.mediaUrl || null, b.mediaType || "video", b.isFunny ? 1 : 0, new Date().toISOString()).run();
-    return json({ id, status: "ok" });
-  }
-
-  return json({ error: "Method not allowed" }, 405);
-}
-
-async function messages(request, env) {
-  // Serwer nigdy nie widzi plaintextu – tylko ciphertext
-  if (request.method === "POST") {
-    const b = await request.json();
-    await env.AL_DB.prepare(
-      `INSERT INTO messages (id, conversation_id, sender_id, type, ciphertext, nonce, created_at, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'sent')`
-    ).bind(b.id, b.conversationId, b.senderId, b.type, b.ciphertext, b.nonce || null, new Date().toISOString()).run();
-    return json({ status: "ok" });
-  }
-  return json({ error: "Use client-side E2EE decryption" }, 400);
-}
-
-async function upload(request, env) {
-  const form = await request.formData();
-  const file = form.get("file");
-  if (!file) return json({ error: "file required" }, 400);
-
-  const key = `media/${Date.now()}-${crypto.randomUUID()}-${file.name || "file"}`;
-  await env.AL_BUCKET.put(key, file.stream(), {
-    httpMetadata: { contentType: file.type || "application/octet-stream" },
-  });
-  return json({ key, url: `https://media.axbridge.app/${key}` });
-}
-
-async function admin(request, env, path) {
-  if (path === "/api/admin/stats") {
-    const users = await env.AL_DB.prepare("SELECT COUNT(*) as c FROM users").first();
-    const posts = await env.AL_DB.prepare("SELECT COUNT(*) as c FROM tiktak_posts").first();
-    return json({ users: users?.c || 0, tiktakPosts: posts?.c || 0 });
-  }
-  return json({ error: "Unknown admin route" }, 404);
-}
-
-function simpleHash(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(16);
-}

@@ -1,3857 +1,648 @@
 // ============================================================
-// AXBridge Ultra — Complete Masterpiece
-// Version: 1.5.0-production
-// Muzyka • Tłumaczenie na żywo PL↔EN • TikTak • Społeczności
-// Persona-aware • Bring Your Own AI (rewolucja)
-// Prawdziwe konta • Pełne profile • Offline-first • E2EE
-// Admin: axelgadomski@icloud.com
-// Backend: Cloudflare Workers (D1 + R2 + KV + AI + Queue)
+// AXBridge v3 — aplikacja społecznościowa dla wszystkich
+// Jeden plik opisuje produkt: interfejs, stan, dane, dostępność.
+// Zasada: AI proponuje, człowiek zatwierdza.
 // ============================================================
 
 app "AXBridge"
-version "1.5.0-production"
+version "3.0.0"
 language pl
 supports ios android web
 orientation automatic
 offline first
 
 // ------------------------------------------------------------
-// THEME & DESIGN TOKENS (Arcydzieło)
+// MOTYW
 // ------------------------------------------------------------
 theme default
   follows system
-  color primary #7C3AED
-  color primaryDark #6D28D9
-  color primarySoft #EDE9FE
+  color primary #6D28D9
+  color primaryDark #5B21B6
   color accent #06B6D4
-  color danger #DC2626
-  color success #16A34A
-  color warning #D97706
-  color background light #FAFAFA
+  color danger #B91C1C
+  color success #15803D
+  color warning #B45309
+  color background light #FFFFFF
   color background dark #09090B
-  color surface light #FFFFFF
+  color surface light #F4F4F5
   color surface dark #18181B
-  color surface2 light #F4F4F5
-  color surface2 dark #27272A
-  color surface3 light #E4E4E7
-  color surface3 dark #3F3F46
   color text light #09090B
   color text dark #FAFAFA
-  color muted light #71717A
+  color muted light #52525B
   color muted dark #A1A1AA
-  color border light #E4E4E7
+  color border light #D4D4D8
   color border dark #3F3F46
-  color overlay #00000080
-  radius small 10
   radius medium 16
   radius large 24
-  radius full 999
   font body "Inter"
-  font mono "JetBrains Mono"
-  font display "Inter"
-  shadow soft 0 1 3 #00000012
-  shadow medium 0 4 16 #00000018
-  shadow strong 0 12 32 #00000028
-  shadow glow 0 0 24 #7C3AED40
-
-style title
-  font size 30
-  weight bold
-  line height 1.15
-  letter spacing -0.4
-
-style heading
-  font size 20
-  weight semibold
-  letter spacing -0.2
-
-style body
-  font size 16
-  weight regular
-  line height 1.5
-
-style caption
-  font size 13
-  weight regular
-  color muted
-
-style buttonPrimary
-  background primary
-  color white
-  radius medium
-  padding 16 22
-  weight semibold
-  shadow medium
-
-style buttonSecondary
-  background surface2
-  color text
-  radius medium
-  padding 14 18
-  weight medium
-
-style buttonGhost
-  background transparent
-  color muted
-  radius medium
-  padding 12 16
-
-style buttonDanger
-  background danger
-  color white
-  radius medium
-  padding 16 22
-  weight semibold
-
-style card
-  background surface
-  radius medium
-  padding 18
-  shadow soft
-  border 1 border
-
-style input
-  background surface2
-  radius medium
-  padding 15 16
-  border 1 border
 
 // ------------------------------------------------------------
-// DATA MODELS
+// MODELE
 // ------------------------------------------------------------
-data User
-  id Text
-  publicId Text
-  email Text
+data Profile
+  userId Text
+  handle Text
   displayName Text
-  avatarUrl Text?
   bio Text?
-  publicKey Text
+  languages List<Text>
   persona Text
-  preferredLang Text
-  isAdmin Boolean
   isVerified Boolean
-  createdAt Date
-  lastSeen Date?
-  profileCompleted Boolean
+  followerCount Number
+  followingCount Number
+  postCount Number
 
-data Contact
+data Post
   id Text
-  user User
-  displayName Text
-  verified Boolean
-  safetyNumber Text?
-  canReceiveAlarm Boolean
-  preferredLang Text?
-  addedAt Date
-  lastMessageAt Date?
-
-data Conversation
-  id Text
-  type Text
-  participants List<User>
-  title Text?
-  lastMessage Message?
-  unreadCount Number
-  isPinned Boolean
-  isMuted Boolean
-  translationEnabled Boolean
-  updatedAt Date
-  createdAt Date
-
-data Message
-  id Text
-  conversationId Text
-  senderId Text
-  type Text
+  authorHandle Text
+  authorName Text
   body Text
-  originalLang Text?
-  translatedBody Text?
-  translatedLang Text?
-  mediaUrl Text?
-  mediaMime Text?
-  durationMs Number?
-  confidence Number?
-  musicMeta MusicMeta?
-  replyToId Text?
+  mediaType Text
+  captions Text?
+  transcript Text?
+  imageAlt Text?
+  signGlosses Text?
+  language Text
+  isSimple Boolean
+  likeCount Number
+  commentCount Number
+  myReaction Text?
   createdAt Date
-  status Text
-  isEncrypted Boolean
 
-data MusicMeta
-  title Text
-  artist Text?
-  provider Text
-  prompt Text?
-  durationMs Number
-  mood Text?
-  isGenerated Boolean
-  fileHash Text?
-  r2Key Text?
+data Comment
+  id Text
+  postId Text
+  parentId Text?
+  authorHandle Text
+  authorName Text
+  body Text
+  language Text
+  createdAt Date
 
 data AccessibilityProfile
   preferredInput Text
   preferredOutput Text
-  morseWpm Number
-  vibrationStrength Number
-  textScale Number
+  fontScale Number
   highContrast Boolean
   reduceMotion Boolean
-  ttsVoice Text
-  ttsRate Number
-  ttsPitch Number
-  autoTranslate Boolean
-  showOriginalAndTranslation Boolean
-  confirmBeforeSend Boolean
-  showConfidence Boolean
-  largeTargets Boolean
-  musicAsEmotion Boolean
-  autoPlayIncoming Boolean
-  screenReaderHints Boolean
-
-data Community
-  id Text
-  name Text
-  description Text
-  coverUrl Text?
-  memberCount Number
-  isPrivate Boolean
-  createdAt Date
-  ownerId Text
-
-data TikTakPost
-  id Text
-  author User
-  mediaUrl Text
-  mediaType Text
-  caption Text
-  mood Text?
-  likes Number
-  comments Number
-  createdAt Date
-  isFunny Boolean
-
-data ProviderConfig
-  id Text
-  name Text
-  type Text
-  baseUrl Text?
-  apiKey Text?
-  model Text?
-  enabled Boolean
-  isDefault Boolean
-  priority Number
-  notes Text?
-  lastUsed Date?
-  usageCount Number
-
-data AppSettings
-  themeMode Text
-  language Text
-  autoTranslate Boolean
-  defaultTargetLang Text
-  musicProvider Text
-  llmProvider Text
-  translateProvider Text
-  sttProvider Text
-  ttsProvider Text
-  notificationsEnabled Boolean
-  soundEnabled Boolean
-  vibrationEnabled Boolean
-  analyticsEnabled Boolean
-  showOnboardingAgain Boolean
-
-data EmergencyEvent
-  id Text
-  initiatorId Text
-  message Text
-  locationShared Boolean
-  latitude Number?
-  longitude Number?
-  expiresAt Date?
-  status Text
-  createdAt Date
-  recipientIds List<Text>
+  simpleMode Boolean
+  signLanguage Text
+  autoSendChannels List<Text>
 
 // ------------------------------------------------------------
-// LOCAL STORES (offline-first)
+// MAGAZYNY
 // ------------------------------------------------------------
 store profile local
+  single Profile
+  key "axbridge.profile.v3"
+  encrypted true
+
+store a11y local
   single AccessibilityProfile
-  key "axbridge.profile.v5"
+  key "axbridge.a11y.v3"
 
-store user local
-  single User
-  key "axbridge.user.v5"
-
-store contacts local
-  list Contact
-  key "axbridge.contacts.v5"
-
-store conversations local
-  list Conversation
-  key "axbridge.conversations.v5"
-
-store messages local
-  list Message
-  key "axbridge.messages.v5"
-
-store communities local
-  list Community
-  key "axbridge.communities.v5"
-
-store tiktak local
-  list TikTakPost
-  key "axbridge.tiktak.v5"
-
-store providers local
-  list ProviderConfig
-  key "axbridge.providers.v5"
+store feed local
+  list Post
+  key "axbridge.feed.v3"
   encrypted true
 
-store settings local
-  single AppSettings
-  key "axbridge.settings.v5"
-
-store musicCache local
-  list MusicMeta
-  key "axbridge.music.v5"
-
-store emergencyHistory local
-  list EmergencyEvent
-  key "axbridge.emergency.v5"
-
-store authToken local
-  single Text
-  key "axbridge.auth.v5"
+store draft local
+  single Post
+  key "axbridge.draft.v3"
   encrypted true
 
 // ------------------------------------------------------------
-// GLOBAL STATE
+// STAN GLOBALNY
 // ------------------------------------------------------------
-global state currentUser User? = none
-global state isLoggedIn Boolean = false
+global state loggedIn Boolean = false
 global state isOnline Boolean = true
-global state activeConversation Conversation? = none
-global state isAdminMode Boolean = false
-global state currentPersona Text = "general"
-global state translationOn Boolean = true
-global state activeMusic MusicMeta? = none
-global state isPlayingMusic Boolean = false
-global state isSyncing Boolean = false
+global state simpleMode Boolean = false
+global state fontSize Number = 1.0
+global state highContrast Boolean = false
+global state reduceMotion Boolean = false
+global state feedFilter Text = "all"
 global state lastError Text = ""
-global state cameraPermission Text = "unknown"
-global state microphonePermission Text = "unknown"
-global state locationPermission Text = "unknown"
-global state authLoading Boolean = false
+global state loading Boolean = false
+global state composerOpen Boolean = false
+global state draftBody Text = ""
+global state draftCaptions Text = ""
+global state draftAlt Text = ""
+global state draftSimple Boolean = false
+global state draftMedia Text = "text"
+global state activePostId Text = ""
 
 // ------------------------------------------------------------
-// SEED PROVIDERS (Bring Your Own AI)
+// FUNKCJE
 // ------------------------------------------------------------
-function seedProviders()
-  if providers is empty
-    add ProviderConfig(id="puter", name="Puter.js", type="llm", enabled=true, isDefault=true, priority=1, notes="Darmowy, bez klucza", usageCount=0) to providers
-    add ProviderConfig(id="puter-music", name="Puter.js Music", type="music", enabled=true, isDefault=true, priority=1, notes="Darmowe generowanie", usageCount=0) to providers
-    add ProviderConfig(id="local-tts", name="System TTS", type="tts", enabled=true, isDefault=true, priority=1, notes="Wbudowany w system", usageCount=0) to providers
-    add ProviderConfig(id="whisper-local", name="Whisper (lokalny)", type="stt", enabled=true, isDefault=true, priority=1, notes="On-device", usageCount=0) to providers
-    add ProviderConfig(id="openai", name="OpenAI", type="llm", enabled=false, priority=2, notes="GPT-4o, o1, Whisper", usageCount=0) to providers
-    add ProviderConfig(id="anthropic", name="Anthropic Claude", type="llm", enabled=false, priority=2, notes="Claude 3.5 / 4", usageCount=0) to providers
-    add ProviderConfig(id="xai", name="xAI Grok", type="llm", enabled=false, priority=2, notes="Grok-2 / Grok-3", usageCount=0) to providers
-    add ProviderConfig(id="google", name="Google Gemini", type="llm", enabled=false, priority=2, notes="Gemini 1.5 / 2.0", usageCount=0) to providers
-    add ProviderConfig(id="groq", name="Groq", type="llm", enabled=false, priority=3, notes="Błyskawiczne inference", usageCount=0) to providers
-    add ProviderConfig(id="perplexity", name="Perplexity", type="llm", enabled=false, priority=3, notes="Research + reasoning", usageCount=0) to providers
-    add ProviderConfig(id="suno", name="Suno", type="music", enabled=false, priority=1, notes="Najwyższa jakość muzyki", usageCount=0) to providers
-    add ProviderConfig(id="hf-music", name="Hugging Face MusicGen", type="music", enabled=false, priority=2, notes="Open-source", usageCount=0) to providers
-    add ProviderConfig(id="deepl", name="DeepL", type="translate", enabled=false, priority=1, notes="Najlepsze tłumaczenia", usageCount=0) to providers
-    add ProviderConfig(id="google-translate", name="Google Translate", type="translate", enabled=false, priority=2, notes="Szerokie wsparcie języków", usageCount=0) to providers
-    add ProviderConfig(id="elevenlabs", name="ElevenLabs", type="tts", enabled=false, priority=2, notes="Najlepsze głosy", usageCount=0) to providers
-    save providers
+function canPublishPost(mediaType Text, captions Text, alt Text) Boolean
+  if mediaType is "video"
+    if captions is ""
+      return false
+  if mediaType is "image"
+    if alt is ""
+      return false
+  return true
 
-function seedDefaultProfile()
-  if profile is none
-    set profile = AccessibilityProfile(
-      preferredInput = "text",
-      preferredOutput = "text",
-      morseWpm = 15,
-      vibrationStrength = 70,
-      textScale = 1.0,
-      highContrast = false,
-      reduceMotion = false,
-      ttsVoice = "default",
-      ttsRate = 1.0,
-      ttsPitch = 1.0,
-      autoTranslate = true,
-      showOriginalAndTranslation = true,
-      confirmBeforeSend = true,
-      showConfidence = true,
-      largeTargets = true,
-      musicAsEmotion = true,
-      autoPlayIncoming = true,
-      screenReaderHints = true
-    )
-    save profile
-
-function seedDefaultSettings()
-  if settings is none
-    set settings = AppSettings(
-      themeMode = "system",
-      language = "pl",
-      autoTranslate = true,
-      defaultTargetLang = "en",
-      musicProvider = "puter-music",
-      llmProvider = "puter",
-      translateProvider = "puter",
-      sttProvider = "whisper-local",
-      ttsProvider = "local-tts",
-      notificationsEnabled = true,
-      soundEnabled = true,
-      vibrationEnabled = true,
-      analyticsEnabled = false,
-      showOnboardingAgain = false
-    )
-    save settings
+function feedQuery(filter Text) Text
+  if filter is "simple"
+    return "/api/posts?simple=1"
+  if filter is "pl"
+    return "/api/posts?lang=pl"
+  if filter is "en"
+    return "/api/posts?lang=en"
+  if filter is "de"
+    return "/api/posts?lang=de"
+  return "/api/posts"
 
 // ------------------------------------------------------------
-// ONBOARDING + PERSONA
+// EKRAN: ONBOARDING
 // ------------------------------------------------------------
 screen Onboarding
   title "AXBridge"
   state step Number = 1
 
   column
-    padding 28
-    gap 28
-    align center
+    padding 24
+    gap 20
 
     if step is 1
-      column
-        gap 22
-        align center
-        image "logo-axbridge.svg"
-          width 96
-          height 96
-          alt "Logo AXBridge"
-          animate appear
-            from opacity 0
-            from scale 0.9
-            to opacity 1
-            to scale 1
-            duration 500ms
-        text "AXBridge"
-          style title
-        text "Komunikator stworzony dla każdego.\nTekst • Mowa • Morse • Migowy • Muzyka"
-          color muted
-          align center
-          max width 340
-          line height 1.5
-        button "Zaczynamy"
-          style buttonPrimary
-          width full
-          height 58
-          when tapped set step = 2
+      text "Komunikacja, która dociera do każdego"
+        style title
+      text "Bez reklam. Bez sprzedaży danych. AI proponuje — Ty decydujesz."
+        color muted
+      button
+        label "Po polsku"
+        height 56
+        accessibility label "Wybierz język polski"
+        when tapped
+          set step = 2
+      button
+        label "English"
+        height 56
+        accessibility label "Choose English"
+        when tapped
+          set step = 2
+      button
+        label "Deutsch"
+        height 56
+        accessibility label "Deutsch wählen"
+        when tapped
+          set step = 2
 
     if step is 2
-      column
-        gap 16
-        text "Kim jesteś?"
-          style heading
-          align center
-        text "Dzięki temu od razu ustawimy najlepsze domyślne opcje."
-          color muted
-          align center
-
-        button "Głuchy / Głucha"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "deaf"
-            set profile.preferredInput = "sign"
-            set profile.preferredOutput = "text"
-            set step = 3
-
-        button "Niemy / Niema"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "mute"
-            set profile.preferredInput = "text"
-            set profile.preferredOutput = "speech"
-            set step = 3
-
-        button "Głuchoniemy / Głuchoniema"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "deafMute"
-            set profile.preferredInput = "sign"
-            set profile.preferredOutput = "text"
-            set step = 3
-
-        button "Niewidomy / Niewidoma"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "blind"
-            set profile.preferredInput = "speech"
-            set profile.preferredOutput = "speech"
-            set profile.musicAsEmotion = true
-            set step = 3
-
-        button "Głuchoniewidomy"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "deafBlind"
-            set profile.preferredInput = "morse"
-            set profile.preferredOutput = "morse"
-            set step = 3
-
-        button "Ograniczona sprawność ruchowa"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "motor"
-            set profile.largeTargets = true
-            set step = 3
-
-        button "Ogólny / Chcę wszystko"
-          style buttonSecondary
-          width full
-          height 56
-          when tapped
-            set currentPersona = "general"
-            set step = 3
+      text "Jak chcesz pisać?"
+        style title
+      text "Wszystko zmienisz później w Ustawieniach."
+        color muted
+      button
+        label "Tekstem"
+        height 56
+        accessibility label "Wejście tekstowe"
+        when tapped
+          set a11y.preferredInput = "text"
+          set step = 3
+      button
+        label "Głosem"
+        height 56
+        accessibility label "Wejście głosowe, mowa na tekst"
+        when tapped
+          set a11y.preferredInput = "voice"
+          set step = 3
+      button
+        label "Kodem Morse'a"
+        height 56
+        accessibility label "Wejście Morse, wibracje"
+        when tapped
+          set a11y.preferredInput = "morse"
+          set reduceMotion = true
+          set step = 3
+      button
+        label "Migiem"
+        height 56
+        accessibility label "Wejście językiem migowym, kamera"
+        when tapped
+          set a11y.preferredInput = "sign"
+          set step = 3
 
     if step is 3
-      column
-        gap 18
-        text "Język i tłumaczenie"
-          style heading
-        text "Piszesz po polsku — rozmówca dostaje od razu po angielsku (i odwrotnie)."
-          color muted
-        segmented settings.defaultTargetLang
-          options pl, en, auto
-          labels "Polski", "English", "Auto"
-        toggle profile.autoTranslate
-          label "Tłumacz wiadomości automatycznie"
-        toggle profile.showOriginalAndTranslation
-          label "Pokazuj oryginał + tłumaczenie"
-        button "Dalej"
-          style buttonPrimary
-          width full
-          height 56
-          when tapped
-            save profile
-            save settings
-            set step = 4
+      text "Jak chcesz odbierać?"
+        style title
+      button
+        label "Czytam tekst"
+        height 56
+        accessibility label "Wyjście tekstowe"
+        when tapped
+          set a11y.preferredOutput = "text"
+          set step = 4
+      button
+        label "Słucham"
+        height 56
+        accessibility label "Wyjście głosowe, czytanie na głos"
+        when tapped
+          set a11y.preferredOutput = "voice"
+          set step = 4
+      button
+        label "Czuję wibracje"
+        height 56
+        accessibility label "Wyjście haptyczne, Morse"
+        when tapped
+          set a11y.preferredOutput = "vibration"
+          set step = 4
+      button
+        label "Widzę napisy"
+        height 56
+        accessibility label "Wyjście napisami i transkrypcją"
+        when tapped
+          set a11y.preferredOutput = "captions"
+          set step = 4
 
     if step is 4
-      column
-        gap 18
-        align center
-        text "Muzyka jako emocja"
-          style heading
-        text "Wysyłaj utwory, generuj muzykę i używaj jej jako reakcji emocjonalnej."
-          color muted
-          align center
-        toggle profile.musicAsEmotion
-          label "Włącz muzykę jako kanał emocji"
-        button "Przejdź do konta"
-          style buttonPrimary
-          width full
-          height 56
-          when tapped
-            seedProviders()
-            seedDefaultProfile()
-            seedDefaultSettings()
-            go to AuthGate
+      text "Dostosuj ekran"
+        style title
+      text "Możesz to zmienić w każdej chwili."
+        color muted
+      toggle highContrast
+        label "Wysoki kontrast"
+      toggle reduceMotion
+        label "Ogranicz animacje"
+      toggle simpleMode
+        label "Tryb uproszczony"
+      button
+        label "Zaczynamy"
+        height 60
+        accessibility label "Zakończ konfigurację i przejdź do aplikacji"
+        when tapped
+          save a11y
+          save profile
+          set loggedIn = true
+          go Feed
 
 // ------------------------------------------------------------
-// PRAWDZIWE LOGOWANIE + KONTA
+// EKRAN: FEED
 // ------------------------------------------------------------
-screen AuthGate
-  title "AXBridge"
-  column
-    padding 28
-    gap 24
-    align center
-    spacer
-    image "logo-axbridge.svg" width 80 height 80
-    text "AXBridge" style title
-    text "Zaloguj się lub utwórz konto" color muted
-    spacer
-    button "Utwórz konto"
-      style buttonPrimary
-      width full
-      height 56
-      when tapped go to Register
-    button "Mam już konto"
-      style buttonSecondary
-      width full
-      height 56
-      when tapped go to Login
-    text "Twoje dane są szyfrowane. Klucze API trzymasz tylko Ty."
-      style caption
-      align center
-      color muted
-
-screen Register
-  title "Rejestracja"
-  state displayName Text = ""
-  state email Text = ""
-  state password Text = ""
-  state password2 Text = ""
-  state error Text = ""
-  state isWorking Boolean = false
-
-  column
-    padding 24
-    gap 16
-    text "Utwórz konto" style title
-    text "Konto jest Twoje. Klucze AI dodasz później w ustawieniach." color muted
-
-    field displayName
-      label "Pseudonim"
-      required
-      min length 2
-      max length 32
-      placeholder "Jak mamy Cię wyświetlać?"
-
-    field email
-      label "E-mail"
-      type email
-      required
-      placeholder "jan@email.com"
-
-    field password
-      label "Hasło"
-      type password
-      required
-      min length 8
-      placeholder "Minimum 8 znaków"
-
-    field password2
-      label "Powtórz hasło"
-      type password
-      required
-
-    if error is not empty
-      text error
-        color danger
-        role alert
-
-    button if isWorking then "Tworzę konto…" else "Zarejestruj się"
-      style buttonPrimary
-      width full
-      height 56
-      disabled isWorking
-      when tapped
-        if displayName is empty or email is empty or password is empty
-          set error = "Uzupełnij wszystkie pola"
-        else if length of password < 8
-          set error = "Hasło musi mieć co najmniej 8 znaków"
-        else if password is not password2
-          set error = "Hasła nie są identyczne"
-        else
-          set error = ""
-          set isWorking = true
-          call api "/auth/register" method POST body {
-            email: email,
-            password: password,
-            displayName: displayName,
-            persona: currentPersona
-          }
-          on success response
-            set currentUser = response.user
-            set authToken = response.token
-            set isLoggedIn = true
-            set isAdminMode = currentUser.isAdmin
-            save user
-            save authToken
-            set isWorking = false
-            go to CompleteProfile
-          on error err
-            set error = err.message or "Nie udało się utworzyć konta"
-            set isWorking = false
-
-    button "Mam już konto — zaloguj się"
-      style buttonGhost
-      when tapped go to Login
-
-screen Login
-  title "Logowanie"
-  state email Text = ""
-  state password Text = ""
-  state error Text = ""
-  state isWorking Boolean = false
-
-  column
-    padding 24
-    gap 16
-    text "Zaloguj się" style title
-
-    field email
-      label "E-mail"
-      type email
-      required
-      placeholder "jan@email.com"
-
-    field password
-      label "Hasło"
-      type password
-      required
-
-    if error is not empty
-      text error
-        color danger
-        role alert
-
-    button if isWorking then "Loguję…" else "Zaloguj"
-      style buttonPrimary
-      width full
-      height 56
-      disabled isWorking
-      when tapped
-        if email is empty or password is empty
-          set error = "Podaj e-mail i hasło"
-        else
-          set error = ""
-          set isWorking = true
-          call api "/auth/login" method POST body {
-            email: email,
-            password: password
-          }
-          on success response
-            set currentUser = response.user
-            set authToken = response.token
-            set isLoggedIn = true
-            set isAdminMode = currentUser.isAdmin
-            save user
-            save authToken
-            set isWorking = false
-            if currentUser.profileCompleted is false
-              go to CompleteProfile
-            else
-              go to MainTabs
-          on error err
-            set error = err.message or "Nieprawidłowy e-mail lub hasło"
-            set isWorking = false
-
-    button "Nie mam konta"
-      style buttonGhost
-      when tapped go to Register
-
-// ------------------------------------------------------------
-// UZUPEŁNIANIE PROFILU
-// ------------------------------------------------------------
-screen CompleteProfile
-  title "Twój profil"
-  state bio Text = ""
-  state preferredLang Text = "pl"
-  state isWorking Boolean = false
-
-  column
-    padding 24
-    gap 18
-    text "Uzupełnij profil" style title
-    text "Możesz to później zmienić w ustawieniach." color muted
-
-    column
-      align center
-      gap 12
-      circle size 96 background primary
-        text left(currentUser.displayName, 1) color white font size 36 weight bold
-      button "Dodaj zdjęcie profilowe"
-        style buttonSecondary
-        when tapped changeAvatar()
-
-    field bio
-      label "Bio (opcjonalne)"
-      multiline
-      max lines 3
-      placeholder "Kilka słów o sobie…"
-
-    text "Preferowany język" style caption
-    segmented preferredLang
-      options pl, en
-      labels "Polski", "English"
-
-    button if isWorking then "Zapisuję…" else "Zapisz i wejdź"
-      style buttonPrimary
-      width full
-      height 56
-      disabled isWorking
-      when tapped
-        set isWorking = true
-        call api "/user/profile" method PATCH body {
-          bio: bio,
-          preferredLang: preferredLang,
-          profileCompleted: true
-        }
-        on success response
-          set currentUser = response.user
-          save user
-          set isWorking = false
-          go to MainTabs
-        on error
-          set isWorking = false
-          go to MainTabs
-
-// ------------------------------------------------------------
-// MAIN TAB BAR
-// ------------------------------------------------------------
-screen MainTabs
-  tab Conversations title "Rozmowy" icon "chat"
-  tab Communities title "Społeczności" icon "people"
-  tab TikTak title "TikTak" icon "sparkles"
-  tab MusicHub title "Muzyka" icon "music"
-  tab ProfileHub title "Profil" icon "person"
-
-// ------------------------------------------------------------
-// CONVERSATIONS
-// ------------------------------------------------------------
-screen Conversations
-  title "Rozmowy"
-  state searchQuery Text = ""
+screen Feed
+  title "Przeglądaj"
   state filter Text = "all"
 
-  when screen appears
-    load conversations
-    load contacts
-    load providers
-    set isSyncing = true
-    wait 300ms
-    set isSyncing = false
-
   column
-    row
-      padding 16 16 8 16
-      text "AXBridge" style title
-      spacer
-      if isSyncing
-        spinner size small
-      button icon "search"
-        accessibility label "Szukaj"
-      button icon "settings"
-        accessibility label "Ustawienia"
-        when tapped go to SettingsHub
-      button icon "alert"
-        accessibility label "Tryb Pomoc"
-        color danger
-        when tapped go to Emergency
-
-    field searchQuery
-      placeholder "Szukaj kontaktu lub wiadomości…"
-      icon left "search"
-      clearable
-
-    row
-      padding 0 16
-      gap 8
-      chip "Wszystkie" selected filter is "all" when tapped set filter = "all"
-      chip "Nieprzeczytane" selected filter is "unread" when tapped set filter = "unread"
-      chip "Przypięte" selected filter is "pinned" when tapped set filter = "pinned"
-
-    list conversations
-      empty
-        column
-          padding 48 24
-          gap 16
-          align center
-          text "Brak rozmów" style heading
-          text "Dodaj kontakt albo dołącz do społeczności." color muted align center
-          button "Dodaj kontakt"
-            style buttonPrimary
-            when tapped go to AddContact
-      item conv
-        if (filter is "all") or (filter is "unread" and conv.unreadCount > 0) or (filter is "pinned" and conv.isPinned)
-          conversationRow conv
-            when tapped
-              set activeConversation = conv
-              go to Chat(conv)
-
-    floatingButton icon "edit"
-      accessibility label "Nowa rozmowa"
-      when tapped go to AddContact
-
-component conversationRow(conv Conversation)
-  card
-    padding 14 16
-    animate press
-      scale 0.98
-      duration 100ms
-    row
-      gap 14
-      avatar conv.participants.first size 48
-      column
-        gap 2
-        row
-          text conv.participants.first.displayName
-            style heading
-            max lines 1
-          spacer
-          if conv.lastMessage is not none
-            text formatRelative(conv.lastMessage.createdAt)
-              style caption
-        row
-          if conv.lastMessage is not none
-            text previewMessage(conv.lastMessage)
-              color muted
-              max lines 1
-          spacer
-          if conv.unreadCount > 0
-            badge conv.unreadCount
-              background primary
-              color white
-
-// ------------------------------------------------------------
-// CHAT — pełny wielokanałowy + tłumaczenie
-// ------------------------------------------------------------
-screen Chat(conversation Conversation)
-  title conversation.participants.first.displayName
-  state inputMode Text = profile.preferredInput
-  state draft Text = ""
-  state morseBuffer Text = ""
-  state isRecording Boolean = false
-  state signCandidates List<Text> = []
-  state signConfidence Number = 0
-  state selectedCandidate Text = ""
-  state replyTo Message? = none
-  state isSending Boolean = false
-
-  when screen appears
-    load messages where conversationId = conversation.id
-    markAsRead(conversation.id)
-
-  column
-    row
-      padding 8 12
-      button icon "back"
-        accessibility label "Wróć"
-        when tapped go back
-      avatar conversation.participants.first size 36
-      column
-        text conversation.participants.first.displayName
-          style heading
-        text if translationOn then "Tłumaczenie włączone" else "Tłumaczenie wyłączone"
-          style caption
-          color if translationOn then success else muted
-      spacer
-      toggle translationOn
-        accessibility label "Włącz lub wyłącz tłumaczenie na żywo"
-
-    list messages where conversationId = conversation.id
-      reverse true
-      item msg
-        messageBubble msg
-
-    if replyTo is not none
-      row
-        padding 8 12
-        background surface2
-        text "Odpowiedź: " + previewMessage(replyTo)
-          max lines 1
-          grow true
-        button icon "close"
-          when tapped set replyTo = none
-
-    row
-      padding 6 10
-      gap 6
-      modeChip "Tekst" "text" inputMode
-      modeChip "Mowa" "speech" inputMode
-      modeChip "Morse" "morse" inputMode
-      modeChip "Migowy" "sign" inputMode
-      modeChip "Muzyka" "music" inputMode
-
-    if inputMode is "text"
-      row
-        padding 8 12
-        gap 8
-        field draft
-          label "Wiadomość"
-          placeholder "Napisz po polsku…"
-          multiline
-          max lines 5
-          grow true
-        button icon "send"
-          accessibility label "Wyślij"
-          disabled draft is empty or isSending
-          when tapped
-            set isSending = true
-            sendTranslatedText(draft, replyTo)
-            set draft = ""
-            set replyTo = none
-            set isSending = false
-
-    if inputMode is "speech"
-      column
-        padding 16
-        gap 12
-        align center
-        text if isRecording then "Słucham…" else "Naciśnij, aby mówić"
-          color muted
-        button if isRecording then "Stop" else "Mów"
-          style if isRecording then buttonDanger else buttonPrimary
-          width 120
-          height 120
-          radius full
-          when tapped
-            if isRecording
-              stopSpeechRecognition()
-            else
-              startSpeechRecognition()
-
-    if inputMode is "morse"
-      column
-        padding 12
-        gap 10
-        card
-          text "Bufor Morse" style caption
-          text if morseBuffer is empty then "• • •" else morseBuffer
-            style mono
-            font size 22
-            min height 40
-        row
-          gap 8
-          button "·"
-            style buttonSecondary
-            height 64
-            grow true
-            accessibility label "Kropka"
-            when tapped
-              append "." to morseBuffer
-              vibrate short
-          button "−"
-            style buttonSecondary
-            height 64
-            grow true
-            accessibility label "Kreska"
-            when tapped
-              append "-" to morseBuffer
-              vibrate medium
-          button "␣"
-            style buttonSecondary
-            height 64
-            grow true
-            accessibility label "Spacja"
-            when tapped append " " to morseBuffer
-          button "⌫"
-            style buttonSecondary
-            height 64
-            accessibility label "Usuń"
-            when tapped
-              if morseBuffer is not empty
-                remove last character from morseBuffer
-        row
-          gap 8
-          button "Wyczyść"
-            style buttonSecondary
-            when tapped set morseBuffer = ""
-          button "Wyślij"
-            style buttonPrimary
-            grow true
-            disabled morseBuffer is empty
-            when tapped
-              sendMorse(morseBuffer, replyTo)
-              set morseBuffer = ""
-              set replyTo = none
-        text "Tempo: " + profile.morseWpm + " słów/min"
-          style caption
-          align center
-
-    if inputMode is "sign"
-      column
-        padding 12
-        gap 12
-        cameraPreview
-          height 240
-          radius medium
-          accessibility label "Kamera do rozpoznawania języka migowego"
-          facing user
-
-        if signCandidates is not empty
-          card
-            text "Rozpoznane znaki" style heading
-            text "Pewność: " + round(signConfidence * 100) + "%"
-              color if signConfidence >= 0.85 then success else if signConfidence >= 0.6 then warning else danger
-
-            list signCandidates
-              item candidate
-                row
-                  text candidate grow true
-                  if candidate is selectedCandidate
-                    text "✓" color success
-                  button "Wybierz"
-                    when tapped set selectedCandidate = candidate
-
-            row
-              gap 8
-              button "Akceptuj i wyślij"
-                style buttonPrimary
-                grow true
-                disabled selectedCandidate is empty
-                when tapped
-                  sendSign(selectedCandidate, signConfidence, replyTo)
-                  set signCandidates = []
-                  set selectedCandidate = ""
-                  set signConfidence = 0
-                  set replyTo = none
-              button "Popraw"
-                style buttonSecondary
-                when tapped
-                  set inputMode = "text"
-                  set draft = selectedCandidate
-              button "Anuluj"
-                style buttonSecondary
-                when tapped
-                  set signCandidates = []
-                  set selectedCandidate = ""
-
-        button if signCandidates is empty then "Rozpocznij rozpoznawanie" else "Rozpoznaj ponownie"
-          style buttonPrimary
-          width full
-          height 56
-          when tapped
-            requestCameraPermission()
-            if cameraPermission is "granted"
-              runSignRecognition()
-            else
-              show alert "Potrzebujemy dostępu do kamery."
-
-        text "Aplikacja nigdy nie wysyła rozpoznanego znaku bez Twojego potwierdzenia."
-          style caption
-          align center
-          color muted
-
-    if inputMode is "music"
-      column
-        padding 12
-        gap 10
-        text "Muzyka jako wiadomość / emocja" style heading
-        button "Generuj muzykę (Suno / Puter / HF)"
-          style buttonPrimary
-          width full
-          height 52
-          when tapped go to MusicGenerator
-        button "Wybierz z pliku"
-          style buttonSecondary
-          width full
-          when tapped pickMusicFileAndSend()
-        button "Szybkie reakcje emocjonalne"
-          style buttonSecondary
-          width full
-          when tapped showMusicReactions()
-        button "Anuluj"
-          when tapped set inputMode = profile.preferredInput
-
-component messageBubble(msg Message)
-  column
-    padding 4 12
-    align if msg.senderId is currentUser.id then end else start
-    max width 85%
-
-    card
-      padding 10 14
-      background if msg.senderId is currentUser.id then primary else surface2
-      color if msg.senderId is currentUser.id then white else text
-      radius medium
-      animate appear
-        from opacity 0
-        from translateY 8
-        to opacity 1
-        to translateY 0
-        duration 220ms
-        curve easeOut
-
-      if msg.type is "text"
-        column
-          gap 4
-          text msg.body
-          if msg.translatedBody is not none and profile.showOriginalAndTranslation
-            text msg.translatedBody
-              style caption
-              opacity 0.9
-              color if msg.senderId is currentUser.id then white else accent
-
-      if msg.type is "music"
-        column
-          gap 6
-          row
-            icon "music"
-            text msg.musicMeta.title weight semibold
-          if msg.musicMeta.mood is not none
-            text "Nastrój: " + msg.musicMeta.mood style caption
-          button "Odtwórz"
-            when tapped playMusic(msg.musicMeta)
-
-      if msg.type is "morse"
-        column
-          gap 4
-          text msg.body style mono font size 18
-          text "Morse" style caption opacity 0.8
-
-      if msg.type is "sign"
-        column
-          gap 4
-          text msg.body weight semibold
-          if msg.confidence is not none and profile.showConfidence
-            text "Pewność " + round(msg.confidence * 100) + "%" style caption
-
-      if msg.type is "image"
-        image msg.mediaUrl
-          width 200
-          height 200
-          radius small
-          alt "Zdjęcie"
-
-      if msg.type is "voice"
-        row
-          gap 8
-          button icon "play"
-            accessibility label "Odtwórz nagranie"
-          text formatDuration(msg.durationMs) style caption
-
-      if msg.type is "alarm"
-        column
-          gap 4
-          text "POMOC" weight bold color danger
-          text msg.body
-
-      if msg.type is "system"
-        text msg.body style caption align center color muted
-
-    row
-      gap 6
-      text formatTime(msg.createdAt) style caption
-      if msg.senderId is currentUser.id
-        text statusIcon(msg.status) style caption
-
-// ------------------------------------------------------------
-// MUSIC HUB + GENERATOR
-// ------------------------------------------------------------
-screen MusicHub
-  title "Muzyka"
-  column
-    padding 16
-    gap 16
-    text "Muzyka jako komunikat" style title
-    button "Generuj nowy utwór"
-      style buttonPrimary
-      width full
-      height 56
-      when tapped go to MusicGenerator
-    button "Moje wygenerowane"
-      style buttonSecondary
-      width full
-      when tapped go to MyMusic
-    button "Odtwarzaj z pliku"
-      style buttonSecondary
-      width full
-      when tapped pickAndPlayLocalMusic()
-    text "Szybkie reakcje emocjonalne" style heading
-    row
-      gap 8
-      musicReactionChip "😊" "happy"
-      musicReactionChip "😌" "calm"
-      musicReactionChip "⚡" "energetic"
-      musicReactionChip "😢" "sad"
-      musicReactionChip "😂" "funny"
-      musicReactionChip "❤️" "love"
-
-screen MusicGenerator
-  title "Generator muzyki"
-  state prompt Text = ""
-  state mood Text = "happy"
-  state isGenerating Boolean = false
-  state result MusicMeta? = none
-  state selectedProvider Text = "suno"
-
-  column
-    padding 16
     gap 14
-    text "Opisz utwór (Suno / Puter.js / HF MusicGen)" style heading
-    field prompt
-      label "Prompt"
-      placeholder "Wesoła ukulele melodia na powitanie przyjaciela"
-      multiline
-      max lines 4
-    text "Nastrój"
-    segmented mood
-      options happy, calm, energetic, sad, funny, love, angry
-      labels "Wesoły", "Spokojny", "Energiczny", "Smutny", "Zabawny", "Miłosny", "Gniewny"
-    text "Dostawca"
-    segmented selectedProvider
-      options suno, puter, huggingface
-      labels "Suno", "Puter.js", "Hugging Face"
-    button if isGenerating then "Generuję…" else "Generuj muzykę"
-      style buttonPrimary
-      width full
-      height 56
-      disabled prompt is empty or isGenerating
-      when tapped
-        set isGenerating = true
-        generateMusic(prompt, mood, selectedProvider)
-        set isGenerating = false
-    if result is not none
-      card
-        text result.title style heading
-        text "Provider: " + result.provider style caption
-        button "Odtwórz" when tapped playMusic(result)
-        button "Wyślij jako wiadomość"
-          style buttonPrimary
-          when tapped
-            sendMusicMessage(result)
-            go back
 
-screen MyMusic
-  title "Moja muzyka"
-  when screen appears
-    load musicCache
-  column
-    padding 16
-    list musicCache
-      empty
-        text "Brak wygenerowanych utworów." color muted
-      item m
-        card
-          text m.title style heading
-          text m.provider + " • " + (m.mood or "—") style caption
-          row
-            button "Odtwórz" when tapped playMusic(m)
-            button "Wyślij" when tapped sendMusicMessage(m)
+    text "Dostępny dla każdego"
+      style heading
+    text "Wideo bez napisów nie pojawia się w tym feedzie. To nie ustawienie — to zasada."
+      color muted
 
-// ------------------------------------------------------------
-// TIKTAK
-// ------------------------------------------------------------
-screen TikTak
-  title "TikTak"
-  when screen appears
-    load tiktak
-  column
     row
-      padding 12 16
-      text "TikTak" style title
-      spacer
-      button icon "plus"
-        accessibility label "Dodaj nowy TikTak"
-        when tapped go to CreateTikTak
-    list tiktak
-      empty
-        column
-          padding 48
-          align center
-          text "Jeszcze cicho…" style heading
-          text "Wrzuć pierwszą głupotę i rozbaw innych." color muted
-          button "Dodaj TikTak"
-            style buttonPrimary
-            when tapped go to CreateTikTak
+      button
+        label "Wszystko"
+        height 48
+        accessibility label "Filtr: wszystkie posty"
+        when tapped
+          set filter = "all"
+          set feedFilter = "all"
+          load feed
+      button
+        label "Proste"
+        height 48
+        accessibility label "Filtr: tylko treści w trybie uproszczonym"
+        when tapped
+          set filter = "simple"
+          set feedFilter = "simple"
+          load feed
+      button
+        label "Polski"
+        height 48
+        accessibility label "Filtr: posty po polsku"
+        when tapped
+          set filter = "pl"
+          set feedFilter = "pl"
+          load feed
+
+    list feed
+      aria-live polite
       item post
-        tiktakCard post
-
-component tiktakCard(post TikTakPost)
-  column
-    gap 8
-    padding 0 0 24 0
-    if post.mediaType is "video" or post.mediaType is "image"
-      image post.mediaUrl
-        width full
-        height 420
-        radius medium
-        alt post.caption
-    if post.mediaType is "music" or post.mediaType is "audio"
-      card
-        height 180
-        align center
-        icon "music" size 48
-        text post.caption
-        button "Odtwórz" when tapped playMusicFromPost(post)
-    row
-      padding 0 12
-      avatar post.author size 32
-      column
-        text post.author.displayName weight semibold
-        text post.caption max lines 2
-    row
-      padding 4 12
-      gap 18
-      button icon "heart" label post.likes
-      button icon "message" label post.comments
-      button icon "share"
-      spacer
-      if post.isFunny
-        text "😂" font size 20
-
-screen CreateTikTak
-  title "Nowy TikTak"
-  state caption Text = ""
-  state mediaType Text = "video"
-  state isFunny Boolean = true
-  column
-    padding 16
-    gap 14
-    field caption
-      label "Opis"
-      placeholder "Coś głupiego i zabawnego…"
-      multiline
-    segmented mediaType
-      options video, image, music, audio
-      labels "Wideo", "Zdjęcie", "Muzyka", "Audio"
-    toggle isFunny
-      label "To jest głupotka / zabawa"
-    button "Wybierz plik / nagraj"
-      style buttonSecondary
-      width full
-      when tapped pickTikTakMedia(mediaType)
-    button "Opublikuj"
-      style buttonPrimary
-      width full
-      height 56
-      when tapped
-        publishTikTak(caption, mediaType, isFunny)
-        go to TikTak
-
-// ------------------------------------------------------------
-// COMMUNITIES
-// ------------------------------------------------------------
-screen Communities
-  title "Społeczności"
-  when screen appears
-    load communities
-  column
-    padding 16
-    gap 12
-    button "Utwórz społeczność"
-      style buttonPrimary
-      width full
-      when tapped go to CreateCommunity
-    list communities
-      empty
-        text "Brak społeczności. Stwórz pierwszą!" color muted
-      item c
         card
-          when tapped go to CommunityDetail(c)
-          text c.name style heading
-          text c.description color muted max lines 2
-          text c.memberCount + " członków" style caption
+          text post.authorName
+            style heading
+            accessibility label "Autor wpisu"
+          text post.body
+            accessibility label "Treść wpisu"
+          if post.imageAlt is not ""
+            text post.imageAlt
+              color muted
+              accessibility label "Opis obrazu"
+          if post.captions is not ""
+            text post.captions
+              color muted
+              accessibility label "Napisy do wideo"
+          if post.transcript is not ""
+            text post.transcript
+              color muted
+              accessibility label "Transkrypcja audio"
+          row
+            button
+              label "Reakcja"
+              height 48
+              accessibility label "Zareaguj na wpis"
+              when tapped
+                set activePostId = post.id
+                call api
+                  path "/api/posts/{activePostId}/reaction"
+                  method "PUT"
+                  on success
+                    show toast "Zapisano reakcję"
+                  on error
+                    set lastError = "Nie udało się zapisać reakcji"
+            button
+              label "Komentarze"
+              height 48
+              accessibility label "Otwórz komentarze do wpisu"
+              when tapped
+                set activePostId = post.id
+                go Comments
+            button
+              label "Zgłoś"
+              height 48
+              accessibility label "Zgłoś wpis do moderacji"
+              when tapped
+                set activePostId = post.id
+                call api
+                  path "/api/posts/{activePostId}/report"
+                  method "POST"
+                  on success
+                    show toast "Zgłoszenie przyjęte"
+                  on error
+                    set lastError = "Zgłoszenie nie zostało wysłane"
 
-screen CreateCommunity
-  title "Nowa społeczność"
-  state name Text = ""
-  state description Text = ""
-  state isPrivate Boolean = false
-  column
-    padding 16
-    gap 14
-    field name
-      label "Nazwa"
-      required
-      placeholder "np. Głusi Warszawa"
-    field description
-      label "Opis"
-      multiline
-      placeholder "O czym jest ta społeczność?"
-    toggle isPrivate
-      label "Społeczność prywatna"
-    button "Utwórz"
-      style buttonPrimary
-      width full
-      height 56
-      disabled name is empty
+    if lastError is not ""
+      text lastError
+        color danger
+        accessibility label "Komunikat błędu"
+
+    button
+      label "Nowy wpis"
+      height 60
+      accessibility label "Utwórz nowy wpis"
       when tapped
-        createCommunity(name, description, isPrivate)
-        go to Communities
-
-screen CommunityDetail(community Community)
-  title community.name
-  column
-    padding 16
-    gap 12
-    text community.name style title
-    text community.description color muted
-    text community.memberCount + " członków" style caption
-    button "Dołącz"
-      style buttonPrimary
-      width full
-    button "Napisz na grupie"
-      style buttonSecondary
-      width full
+        set composerOpen = true
+        go Composer
 
 // ------------------------------------------------------------
-// EMERGENCY / HELP
+// EKRAN: COMPOSER
+// ------------------------------------------------------------
+screen Composer
+  title "Nowy wpis"
+
+  column
+    gap 16
+
+    text "Co chcesz powiedzieć?"
+      style heading
+
+    field draftBody
+      label "Treść wpisu"
+      accessibility label "Wpisz treść wpisu"
+
+    button
+      label "Zdjęcie"
+      height 48
+      accessibility label "Typ wpisu: zdjęcie, wymaga opisu"
+      when tapped
+        set draftMedia = "image"
+    button
+      label "Wideo"
+      height 48
+      accessibility label "Typ wpisu: wideo, wymaga napisów"
+      when tapped
+        set draftMedia = "video"
+    button
+      label "Tekst"
+      height 48
+      accessibility label "Typ wpisu: tekst"
+      when tapped
+        set draftMedia = "text"
+
+    if draftMedia is "image"
+      field draftAlt
+        label "Opis zdjęcia dla osób niewidomych"
+        accessibility label "Opisz, co jest na zdjęciu"
+
+    if draftMedia is "video"
+      field draftCaptions
+        label "Napisy do wideo"
+        accessibility label "Wpisz napisy do wideo"
+
+    toggle draftSimple
+      label "Oznacz jako tekst w trybie uproszczonym"
+
+    if draftMedia is "image"
+      if draftAlt is ""
+        text "Zdjęcie bez opisu nie zostanie opublikowane."
+          color warning
+          accessibility label "Ostrzeżenie o braku opisu"
+
+    if draftMedia is "video"
+      if draftCaptions is ""
+        text "Wideo bez napisów nie zostanie opublikowane."
+          color warning
+          accessibility label "Ostrzeżenie o braku napisów"
+
+    button
+      label "Opublikuj"
+      height 60
+      accessibility label "Opublikuj wpis"
+      when tapped
+        set lastError = ""
+        call api
+          path "/api/posts"
+          method "POST"
+          on success
+            set draftBody = ""
+            set draftCaptions = ""
+            set draftAlt = ""
+            set composerOpen = false
+            show toast "Opublikowano"
+            go Feed
+          on error
+            set lastError = "Nie udało się opublikować. Sprawdź napisy i opis."
+
+    if lastError is not ""
+      text lastError
+        color danger
+        accessibility label "Komunikat błędu"
+
+// ------------------------------------------------------------
+// EKRAN: KOMENTARZE
+// ------------------------------------------------------------
+screen Comments
+  title "Komentarze"
+  state newComment Text = ""
+
+  column
+    gap 14
+
+    list comments
+      aria-live polite
+      item comment
+        card
+          text comment.authorName
+            style heading
+            accessibility label "Autor komentarza"
+          text comment.body
+            accessibility label "Treść komentarza"
+
+    field newComment
+      label "Twój komentarz"
+      accessibility label "Napisz komentarz"
+
+    button
+      label "Dodaj komentarz"
+      height 56
+      accessibility label "Wyślij komentarz"
+      when tapped
+        set lastError = ""
+        call api
+          path "/api/posts/{activePostId}/comments"
+          method "POST"
+          on success
+            set newComment = ""
+            show toast "Komentarz dodany"
+          on error
+            set lastError = "Komentarz nie został wysłany"
+
+    if lastError is not ""
+      text lastError
+        color danger
+        accessibility label "Komunikat błędu"
+
+// ------------------------------------------------------------
+// EKRAN: PROFIL
+// ------------------------------------------------------------
+screen Profile
+  title "Profil"
+
+  column
+    gap 16
+
+    text profile.displayName
+      style title
+      accessibility label "Nazwa profilu"
+    text profile.handle
+      color muted
+      accessibility label "Identyfikator profilu"
+    text profile.bio
+      accessibility label "O mnie"
+
+    row
+      text "Obserwujący"
+        accessibility label "Liczba obserwujących"
+      text "Wpisy"
+        accessibility label "Liczba wpisów"
+
+    text "Twoje dane zostają na Twoim urządzeniu. Serwer widzi tylko zaszyfrowane koperty."
+      color muted
+      accessibility label "Informacja o prywatności"
+
+    button
+      label "Ustawienia dostępności"
+      height 56
+      accessibility label "Otwórz ustawienia dostępności"
+      when tapped
+        go Settings
+
+    button
+      label "Zapisz profil"
+      height 56
+      accessibility label "Zapisz profil lokalnie"
+      when tapped
+        save profile
+        show toast "Profil zapisany"
+
+// ------------------------------------------------------------
+// EKRAN: USTAWIENIA DOSTĘPNOŚCI
+// ------------------------------------------------------------
+screen Settings
+  title "Dostępność"
+
+  column
+    gap 16
+
+    toggle highContrast
+      label "Wysoki kontrast"
+      accessibility label "Włącz wysoki kontrast"
+    toggle reduceMotion
+      label "Ogranicz animacje"
+      accessibility label "Wyłącz animacje"
+    toggle simpleMode
+      label "Tryb uproszczony — duże przyciski, krótkie zdania"
+      accessibility label "Włącz tryb uproszczony"
+
+    slider fontSize
+      label "Rozmiar tekstu (100–300%)"
+      accessibility label "Ustaw rozmiar tekstu"
+
+    segmented a11y.preferredInput
+      options text, voice, morse, sign
+      labels "Tekst", "Głos", "Morse", "Mig"
+
+    segmented a11y.preferredOutput
+      options text, voice, vibration, captions
+      labels "Tekst", "Głos", "Wibracje", "Napisy"
+
+    button
+      label "Zapisz"
+      height 60
+      accessibility label "Zapisz ustawienia dostępności"
+      when tapped
+        save a11y
+        show toast "Ustawienia zapisane"
+        go Feed
+
+// ------------------------------------------------------------
+// EKRAN: POMOC
 // ------------------------------------------------------------
 screen Emergency
   title "Tryb Pomoc"
-  state selected List<Contact> = []
-  state customMessage Text = "Potrzebuję pomocy. Proszę o kontakt."
-  state shareLocation Boolean = false
-  state locationDuration Number = 30
-  state step Text = "select"
-  state isSending Boolean = false
 
-  when screen appears
-    load contacts
+  confirm alarm
+    beforeSend true
+    channel "alarm"
+    accessibility label "Potwierdź wysłanie alarmu do zaufanych kontaktów"
 
   column
-    padding 20
-    gap 20
-
-    if step is "select"
-      column
-        gap 16
-        text "Tryb Pomoc"
-          style title
-          color danger
-        text "Wybierz zaufane kontakty. Lokalizacja jest opcjonalna i zawsze czasowo ograniczona."
-          color muted
-        list contacts where canReceiveAlarm is true
-          empty
-            text "Brak kontaktów z uprawnieniem alarmowym. Dodaj je w ustawieniach kontaktu." color muted
-          item c
-            row
-              checkbox isSelected(c)
-                when changed value
-                  if value
-                    add c to selected
-                  else
-                    remove c from selected
-              column
-                text c.displayName style heading
-                if c.verified
-                  text "Zweryfikowany" style caption color success
-        field customMessage
-          label "Wiadomość"
-          multiline
-          max lines 3
-        toggle shareLocation
-          label "Udostępnij lokalizację"
-        if shareLocation
-          column
-            text "Czas udostępnienia" style caption
-            segmented locationDuration
-              options 15, 30, 60
-              labels "15 min", "30 min", "60 min"
-        button "Dalej"
-          style buttonDanger
-          width full
-          height 56
-          disabled selected is empty
-          when tapped set step = "confirm"
-
-    if step is "confirm"
-      column
-        gap 16
-        text "Potwierdź wysłanie" style heading
-        card
-          text "Odbiorcy: " + selected.length
-          text "Wiadomość: " + customMessage
-          if shareLocation
-            text "Lokalizacja: tak, na " + locationDuration + " min"
-          else
-            text "Lokalizacja: nie"
-        text "To działanie powiadomi wybrane osoby."
-          color muted
-        button "Wyślij prośbę o pomoc"
-          style buttonDanger
-          width full
-          height 64
-          disabled isSending
-          when tapped
-            set isSending = true
-            sendEmergencyEvent(selected, customMessage, shareLocation, locationDuration)
-            set isSending = false
-            set step = "sent"
-        button "Wróć"
-          style buttonSecondary
-          when tapped set step = "select"
-
-    if step is "sent"
-      column
-        gap 20
-        align center
-        text "Powiadomienie wysłane"
-          style title
-          color success
-        text "Zaufane kontakty zostały powiadomione."
-          color muted
-          align center
-        button "Zamknij"
-          style buttonPrimary
-          width full
-          when tapped go to Conversations
-        button "Anuluj alarm"
-          style buttonSecondary
-          when tapped
-            cancelEmergency()
-            go to Conversations
-
-// ------------------------------------------------------------
-// SETTINGS HUB
-// ------------------------------------------------------------
-screen SettingsHub
-  title "Ustawienia"
-  column
-    padding 8
-    settingsItem "person" "Profil" currentUser.displayName
-      when tapped go to EditProfile
-    settingsItem "accessibility" "Dostępność" "Kanały, Morse, tekst, mowa"
-      when tapped go to AccessibilitySettings
-    settingsItem "globe" "Język i tłumaczenie" "PL ↔ EN na żywo"
-      when tapped go to TranslationSettings
-    settingsItem "music" "Muzyka" "Suno, Puter, pliki"
-      when tapped go to MusicSettings
-    settingsItem "sparkles" "Sztuczna inteligencja" "Wybierz swoje AI i wklej klucze"
-      when tapped go to AIProvidersSettings
-    settingsItem "shield" "Bezpieczeństwo" "E2EE, klucze, backup"
-      when tapped go to SecuritySettings
-    settingsItem "bell" "Powiadomienia" ""
-      when tapped go to NotificationSettings
-    if isAdminMode
-      settingsItem "crown" "Panel Admina" "axelgadomski@icloud.com"
-        when tapped go to AdminPanel
-
-// ------------------------------------------------------------
-// BRING YOUR OWN AI (rewolucja)
-// ------------------------------------------------------------
-screen AIProvidersSettings
-  title "Sztuczna inteligencja"
-  column
-    padding 16
     gap 16
 
-    card
-      background primarySoft
-      padding 16
-      column
-        gap 8
-        text "Bring Your Own AI" style heading color primary
-        text "Ty decydujesz, którego modelu używasz. Klucze API trzymasz tylko u siebie — zaszyfrowane na urządzeniu. My nigdy ich nie widzimy."
-          color muted
-          font size 14
-
-    text "Aktywne dostawcy" style caption weight semibold
-
-    list providers
-      item p
-        card
-          padding 14
-          column
-            gap 10
-            row
-              column grow true
-                text p.name style heading
-                text p.type + if p.notes is not none then " • " + p.notes else ""
-                  style caption
-                if p.isDefault
-                  text "Domyślny" color success style caption
-              toggle p.enabled
-                when changed value
-                  update p.enabled = value
-                  save providers
-
-            if p.enabled and p.id is not "puter" and p.id is not "puter-music" and p.id is not "local-tts" and p.id is not "whisper-local"
-              column
-                gap 8
-                field p.apiKey
-                  label "API Key / Token"
-                  type password
-                  placeholder "Wklej swój klucz…"
-                  when changed
-                    save providers
-                if p.type is "llm"
-                  field p.model
-                    label "Model (opcjonalnie)"
-                    placeholder "np. gpt-4o, claude-3-5-sonnet, grok-2"
-                    when changed save providers
-                text "Klucz jest szyfrowany lokalnie i nigdy nie opuszcza Twojego urządzenia."
-                  style caption
-                  color muted
-
-    button "Dodaj własnego dostawcę"
-      style buttonSecondary
-      width full
-      when tapped go to AddProvider
-
-    button "Przywróć listę domyślną"
-      style buttonGhost
-      width full
-      when tapped
-        clear providers
-        seedProviders()
-
-screen AddProvider
-  title "Nowy dostawca"
-  state name Text = ""
-  state type Text = "llm"
-  state apiKey Text = ""
-  state baseUrl Text = ""
-  state model Text = ""
-
-  column
-    padding 16
-    gap 14
-    field name
-      label "Nazwa"
-      required
-      placeholder "np. Mój Claude / Groq / własny endpoint"
-    segmented type
-      options llm, music, translate, stt, tts
-      labels "LLM", "Muzyka", "Tłumaczenie", "STT", "TTS"
-    field apiKey
-      label "API Key"
-      type password
-      placeholder "sk-… lub token"
-    field baseUrl
-      label "Base URL (opcjonalnie)"
-      placeholder "https://api.example.com/v1"
-    field model
-      label "Domyślny model (opcjonalnie)"
-      placeholder "gpt-4o / claude-3-5-sonnet / grok-2"
-    button "Dodaj i zaszyfruj"
-      style buttonPrimary
-      width full
-      height 56
-      disabled name is empty
-      when tapped
-        add ProviderConfig(
-          id = newId(),
-          name = name,
-          type = type,
-          apiKey = apiKey,
-          baseUrl = baseUrl,
-          model = model,
-          enabled = true,
-          isDefault = false,
-          priority = 10,
-          usageCount = 0
-        ) to providers
-        save providers
-        go back
-
-// ------------------------------------------------------------
-// POZOSTAŁE USTAWIENIA
-// ------------------------------------------------------------
-screen TranslationSettings
-  title "Tłumaczenie"
-  column
-    padding 16
-    gap 12
-    toggle profile.autoTranslate
-      label "Automatyczne tłumaczenie w rozmowach"
-    toggle profile.showOriginalAndTranslation
-      label "Pokazuj oryginał + tłumaczenie"
-    text "Domyślny język docelowy"
-    segmented settings.defaultTargetLang
-      options pl, en, auto
-      labels "Polski", "English", "Auto"
-    button "Zapisz"
-      style buttonPrimary
-      width full
-      when tapped
-        save profile
-        save settings
-        go back
-
-screen MusicSettings
-  title "Ustawienia muzyki"
-  column
-    padding 16
-    gap 12
-    toggle profile.musicAsEmotion
-      label "Muzyka jako kanał emocji"
-    text "Domyślny generator"
-    segmented settings.musicProvider
-      options suno, puter, huggingface
-      labels "Suno", "Puter.js", "Hugging Face"
-    button "Wyczyść cache muzyki"
-      style buttonSecondary
-      when tapped
-        clear musicCache
-        show toast "Cache wyczyszczony"
-    button "Zapisz"
-      style buttonPrimary
-      width full
-      when tapped
-        save profile
-        save settings
-        go back
-
-screen AccessibilitySettings
-  title "Dostępność"
-  column
-    padding 16
-    gap 10
-    sectionHeader "Kanały komunikacji"
-    text "Preferowany kanał wejścia" style caption
-    segmented profile.preferredInput
-      options text, speech, morse, sign
-      labels "Tekst", "Mowa", "Morse", "Migowy"
-    text "Preferowany kanał wyjścia" style caption
-    segmented profile.preferredOutput
-      options text, speech, morse, signAvatar
-      labels "Tekst", "Mowa", "Morse", "Awatar migowy"
-    sectionHeader "Morse"
-    text "Tempo (słów/min): " + profile.morseWpm
-    slider profile.morseWpm min 5 max 35 step 1
-    text "Siła wibracji: " + profile.vibrationStrength + "%"
-    slider profile.vibrationStrength min 10 max 100 step 5
-    sectionHeader "Tekst i wygląd"
-    text "Skala tekstu: " + round(profile.textScale * 100) + "%"
-    slider profile.textScale min 0.85 max 2.2 step 0.05
-    toggle profile.highContrast label "Wysoki kontrast"
-    toggle profile.largeTargets label "Duże cele dotykowe"
-    toggle profile.reduceMotion label "Ogranicz animacje"
-    sectionHeader "Mowa (TTS)"
-    text "Szybkość: " + profile.ttsRate
-    slider profile.ttsRate min 0.7 max 1.6 step 0.1
-    sectionHeader "Zachowanie"
-    toggle profile.autoPlayIncoming label "Auto-odtwarzaj przychodzące"
-    toggle profile.confirmBeforeSend label "Potwierdzaj przed wysłaniem migowego"
-    toggle profile.showConfidence label "Pokazuj poziom pewności"
-    toggle profile.screenReaderHints label "Dodatkowe podpowiedzi czytnika"
-    button "Przywróć domyślne"
-      style buttonSecondary
-      width full
-      when tapped
-        resetProfileToDefaults()
-        save profile
-    button "Zapisz zmiany"
-      style buttonPrimary
-      width full
-      height 52
-      when tapped
-        save profile
-        show toast "Zapisano ustawienia dostępności"
-        go back
-
-screen SecuritySettings
-  title "Bezpieczeństwo"
-  column
-    padding 16
-    gap 12
-    card
-      text "Szyfrowanie end-to-end" style heading
-      text "Wszystkie wiadomości są szyfrowane na Twoim urządzeniu. Serwer widzi tylko zaszyfrowane dane." color muted
-    card
-      text "Twój Safety Number" style heading
-      text currentUser.publicId style mono
-      button "Pokaż kod QR do weryfikacji"
-        style buttonSecondary
-        when tapped showSafetyQR()
-    toggle settings.notificationsEnabled
-      label "Powiadomienia push (tylko metadane)"
-    button "Eksportuj zaszyfrowaną kopię zapasową"
-      style buttonSecondary
-      width full
-      when tapped exportEncryptedBackup()
-    text "Ostatnia synchronizacja kluczy: " + formatRelative(now())
-      style caption
+    text "Alarm trafia tylko do zaufanych kontaktów. Lokalizacja wygasa automatycznie."
       color muted
-
-screen NotificationSettings
-  title "Powiadomienia"
-  column
-    padding 16
-    gap 12
-    toggle settings.notificationsEnabled label "Włącz powiadomienia"
-    toggle settings.soundEnabled label "Dźwięk"
-    toggle settings.vibrationEnabled label "Wibracje"
-    button "Zapisz"
-      style buttonPrimary
-      width full
-      when tapped
-        save settings
-        go back
-
-// ------------------------------------------------------------
-// ADMIN PANEL
-// ------------------------------------------------------------
-screen AdminPanel
-  title "Panel Admina"
-  column
-    padding 16
-    gap 12
-    text "Zalogowany jako admin" style heading
-    text "axelgadomski@icloud.com" style mono color muted
-    button "Przegląd użytkowników"
-      style buttonSecondary
-      width full
-    button "Moderacja TikTak"
-      style buttonSecondary
-      width full
-    button "Moderacja społeczności"
-      style buttonSecondary
-      width full
-    button "Logi systemowe"
-      style buttonSecondary
-      width full
-    button "Wymuś synchronizację D1 / R2"
-      style buttonSecondary
-      width full
-    button "Wyślij komunikat globalny"
-      style buttonPrimary
-      width full
-
-// ------------------------------------------------------------
-// PROFILE
-// ------------------------------------------------------------
-screen ProfileHub
-  title "Profil"
-  column
-    padding 24
-    gap 16
-    align center
-    circle size 104 background primary
-      if currentUser.avatarUrl is not none
-        image currentUser.avatarUrl width 104 height 104 radius full
-      else
-        text left(currentUser.displayName, 1) color white font size 40 weight bold
-    text currentUser.displayName style title
-    text currentUser.publicId style mono color muted
-    text "Persona: " + personaLabel(currentUser.persona) style caption
-    if currentUser.isAdmin
-      text "Administrator" color success style caption
-    if currentUser.isVerified
-      text "Konto zweryfikowane" color success style caption
-
-    button "Edytuj profil"
-      style buttonSecondary
-      width full
-      when tapped go to EditProfile
-    button "Sztuczna inteligencja"
-      style buttonSecondary
-      width full
-      when tapped go to AIProvidersSettings
-    button "Wyloguj"
-      style buttonGhost
-      width full
-      when tapped logout()
-
-screen EditProfile
-  title "Edytuj profil"
-  state name Text = currentUser.displayName
-  state bio Text = currentUser.bio or ""
-  state preferredLang Text = currentUser.preferredLang
-  state isWorking Boolean = false
-
-  column
-    padding 20
-    gap 18
-    align center
+      accessibility label "Informacja o trybie Pomoc"
 
     button
-      when tapped changeAvatar()
-      circle
-        size 110
-        background primary
-        if currentUser.avatarUrl is not none
-          image currentUser.avatarUrl
-            width 110 height 110 radius full
-            alt "Zdjęcie profilowe"
-        else
-          text left(currentUser.displayName, 1)
-            color white font size 42 weight bold
-    text "Zmień zdjęcie" style caption color primary
+      label "Wezwij pomoc — 15 minut"
+      height 64
+      accessibility label "Wyślij alarm z lokalizacją na 15 minut"
+      when tapped
+        set lastError = ""
+        call api
+          path "/api/emergency"
+          method "POST"
+          on success
+            show toast "Alarm wysłany"
+          on error
+            set lastError = "Alarm nie został wysłany"
 
-    field name
-      label "Pseudonim"
-      required
-      min length 2
-      max length 32
-
-    field bio
-      label "Bio"
-      multiline
-      max lines 4
-      placeholder "Kilka słów o sobie…"
-
-    text "Preferowany język" style caption
-    segmented preferredLang
-      options pl, en
-      labels "Polski", "English"
-
-    button if isWorking then "Zapisuję…" else "Zapisz zmiany"
-      style buttonPrimary
-      width full
+    button
+      label "Anuluj alarm"
       height 56
-      disabled isWorking or name is empty
+      accessibility label "Anuluj aktywny alarm i wyczyść lokalizację"
       when tapped
-        set isWorking = true
-        call api "/user/profile" method PATCH body {
-          displayName: name,
-          bio: bio,
-          preferredLang: preferredLang
-        }
-        on success response
-          set currentUser = response.user
-          save user
-          set isWorking = false
-          show toast "Profil zaktualizowany"
-          go back
-        on error
-          set isWorking = false
-          show toast "Nie udało się zapisać"
-
-// ------------------------------------------------------------
-// ADD CONTACT
-// ------------------------------------------------------------
-screen AddContact
-  title "Dodaj kontakt"
-  state method Text = "code"
-  state code Text = ""
-  state error Text = ""
-  state isSearching Boolean = false
-  column
-    padding 20
-    gap 16
-    segmented method
-      options code, qr, nearby
-      labels "Kod", "QR", "W pobliżu"
-    if method is "code"
-      field code
-        label "Kod kontaktu"
-        placeholder "AXB-XXXXXX"
-        autocapitalize characters
-      button "Dodaj"
-        style buttonPrimary
-        width full
-        height 52
-        disabled code is empty or isSearching
-        when tapped
-          set isSearching = true
-          addContactByCode(code)
-          set isSearching = false
-    if method is "qr"
-      column
-        gap 12
-        align center
-        cameraPreview height 260
-          accessibility label "Skaner kodu QR"
-        text "Skieruj aparat na kod QR kontaktu" color muted
-    if method is "nearby"
-      column
-        gap 12
-        text "Szukam urządzeń w pobliżu przez Bluetooth…" color muted
-        spinner
-        text "Funkcja mesh będzie w pełni dostępna w kolejnej wersji." style caption
-    if error is not empty
-      text error color danger role alert
-
-// ------------------------------------------------------------
-// REUSABLE COMPONENTS
-// ------------------------------------------------------------
-component sectionHeader(title Text)
-  text title
-    style caption
-    weight semibold
-    color muted
-    padding 16 4 6 4
-    uppercase true
-
-component settingsItem(icon Text, title Text, subtitle Text)
-  row
-    padding 14 16
-    gap 14
-    icon icon size 22
-    column
-      text title style body
-      text subtitle style caption
-    spacer
-    icon "chevron.right" color muted
-
-component modeChip(label Text, mode Text, current Text)
-  chip label
-    selected current is mode
-    when tapped set inputMode = mode
-
-component musicReactionChip(emoji Text, mood Text)
-  button emoji
-    font size 28
-    width 48
-    height 48
-    radius full
-    background surface2
-    when tapped sendMusicReaction(mood)
-
-component chip(label Text)
-  text label
-    padding 8 14
-    radius full
-    background if selected then primary else surface2
-    color if selected then white else text
-    weight if selected then semibold else regular
-
-component avatar(user User, size Number = 40)
-  circle
-    size size
-    background primary
-    if user.avatarUrl is not none
-      image user.avatarUrl
-        width size
-        height size
-        radius full
-        alt user.displayName
-    else
-      text left(user.displayName, 1)
-        color white
-        weight bold
-        font size size * 0.4
-
-// ------------------------------------------------------------
-// HELPER FUNCTIONS
-// ------------------------------------------------------------
-function sendTranslatedText(body Text, reply Message?)
-  if body is empty
-    return
-  add Message(
-    id = newId(),
-    conversationId = activeConversation.id,
-    senderId = currentUser.id,
-    type = "text",
-    body = body,
-    originalLang = "pl",
-    translatedBody = translate(body, settings.defaultTargetLang),
-    translatedLang = settings.defaultTargetLang,
-    replyToId = if reply is not none then reply.id else none,
-    createdAt = now(),
-    status = "sent",
-    isEncrypted = true
-  ) to messages
-  save messages
-
-function translate(text Text, targetLang Text) returns Text
-  if targetLang is "en"
-    return "[EN] " + text
-  if targetLang is "pl"
-    return "[PL] " + text
-  return text
-
-function sendMorse(morse Text, reply Message?)
-  if morse is empty
-    return
-  add Message(
-    id = newId(),
-    conversationId = activeConversation.id,
-    senderId = currentUser.id,
-    type = "morse",
-    body = morse,
-    replyToId = if reply is not none then reply.id else none,
-    createdAt = now(),
-    status = "sent",
-    isEncrypted = true
-  ) to messages
-  save messages
-  playMorseVibration(morse, profile.morseWpm, profile.vibrationStrength)
-
-function sendSign(gloss Text, confidence Number, reply Message?)
-  add Message(
-    id = newId(),
-    conversationId = activeConversation.id,
-    senderId = currentUser.id,
-    type = "sign",
-    body = gloss,
-    confidence = confidence,
-    replyToId = if reply is not none then reply.id else none,
-    createdAt = now(),
-    status = "sent",
-    isEncrypted = true
-  ) to messages
-  save messages
-
-function generateMusic(prompt Text, mood Text, provider Text)
-  set result = MusicMeta(
-    title = "Generated: " + left(prompt, 32),
-    provider = provider,
-    prompt = prompt,
-    mood = mood,
-    durationMs = 32000,
-    isGenerated = true
-  )
-  add result to musicCache
-  save musicCache
-
-function sendMusicMessage(meta MusicMeta)
-  if activeConversation is none
-    show toast "Wybierz najpierw rozmowę"
-    return
-  add Message(
-    id = newId(),
-    conversationId = activeConversation.id,
-    senderId = currentUser.id,
-    type = "music",
-    body = meta.title,
-    musicMeta = meta,
-    createdAt = now(),
-    status = "sent",
-    isEncrypted = true
-  ) to messages
-  save messages
-
-function sendMusicReaction(mood Text)
-  set result = MusicMeta(
-    title = "Reakcja: " + mood,
-    provider = "local",
-    mood = mood,
-    durationMs = 8000,
-    isGenerated = true
-  )
-  sendMusicMessage(result)
-
-function playMusic(meta MusicMeta)
-  set activeMusic = meta
-  set isPlayingMusic = true
-
-function playMusicFromPost(post TikTakPost)
-  set isPlayingMusic = true
-
-function playMorseVibration(morse Text, wpm Number, strength Number)
-  vibrate pattern from morse
-
-function runSignRecognition()
-  set signCandidates = ["CZEŚĆ", "DZIĘKUJĘ", "TAK", "NIE", "POMOC", "PROSZĘ"]
-  set signConfidence = 0.87
-  set selectedCandidate = "CZEŚĆ"
-
-function startSpeechRecognition()
-  set isRecording = true
-  requestMicrophonePermission()
-
-function stopSpeechRecognition()
-  set isRecording = false
-
-function markAsRead(conversationId Text)
-  // Aktualizuje statusy na read
-
-function sendEmergencyEvent(contacts List<Contact>, message Text, withLocation Boolean, durationMin Number)
-  add EmergencyEvent(
-    id = newId(),
-    initiatorId = currentUser.id,
-    message = message,
-    locationShared = withLocation,
-    expiresAt = if withLocation then now() + durationMin * 60 else none,
-    status = "active",
-    createdAt = now(),
-    recipientIds = contacts.map(c => c.id)
-  ) to emergencyHistory
-  save emergencyHistory
-  show notification "Powiadomienie o pomocy zostało wysłane"
-
-function cancelEmergency()
-  // Anuluje aktywne zdarzenie
-
-function createCommunity(name Text, description Text, isPrivate Boolean)
-  add Community(
-    id = newId(),
-    name = name,
-    description = description,
-    memberCount = 1,
-    isPrivate = isPrivate,
-    createdAt = now(),
-    ownerId = currentUser.id
-  ) to communities
-  save communities
-
-function publishTikTak(caption Text, mediaType Text, isFunny Boolean)
-  add TikTakPost(
-    id = newId(),
-    author = currentUser,
-    mediaUrl = "r2://placeholder",
-    mediaType = mediaType,
-    caption = caption,
-    likes = 0,
-    comments = 0,
-    createdAt = now(),
-    isFunny = isFunny
-  ) to tiktak
-  save tiktak
-
-function addContactByCode(code Text)
-  if code is empty
-    set error = "Wpisz kod"
-    return
-  show toast "Kontakt dodany (symulacja)"
-  go to Conversations
-
-function changeAvatar()
-  pickImage
-    on success url
-      call api "/user/avatar" method POST body { avatarUrl: url }
-      on success response
-        set currentUser = response.user
-        save user
-        show toast "Zdjęcie zaktualizowane"
-
-function showSafetyQR()
-  // Modal z QR + safety number
-
-function exportEncryptedBackup()
-  show toast "Backup przygotowywany…"
-
-function pickMusicFileAndSend()
-  // Wybór pliku muzycznego + wysyłka
-
-function pickAndPlayLocalMusic()
-  // Lokalny plik → odtwarzanie
-
-function pickTikTakMedia(mediaType Text)
-  // Kamera / galeria / mikrofon
-
-function showMusicReactions()
-  // Szybki bottom sheet z reakcjami
-
-function requestCameraPermission()
-  set cameraPermission = "granted"
-
-function requestMicrophonePermission()
-  set microphonePermission = "granted"
-
-function resetProfileToDefaults()
-  set profile.preferredInput = "text"
-  set profile.preferredOutput = "text"
-  set profile.morseWpm = 15
-  set profile.vibrationStrength = 70
-  set profile.textScale = 1.0
-  set profile.highContrast = false
-  set profile.reduceMotion = false
-  set profile.ttsRate = 1.0
-  set profile.ttsPitch = 1.0
-  set profile.autoTranslate = true
-  set profile.showOriginalAndTranslation = true
-  set profile.confirmBeforeSend = true
-  set profile.showConfidence = true
-  set profile.largeTargets = true
-  set profile.musicAsEmotion = true
-  set profile.autoPlayIncoming = true
-  set profile.screenReaderHints = true
-
-function logout()
-  call api "/auth/logout" method POST
-  set currentUser = none
-  set isLoggedIn = false
-  set isAdminMode = false
-  set activeConversation = none
-  set authToken = none
-  clear authToken
-  go to AuthGate
-
-function personaLabel(p Text) returns Text
-  if p is "deaf" return "Głuchy/Głucha"
-  if p is "mute" return "Niemy/Niema"
-  if p is "deafMute" return "Głuchoniemy"
-  if p is "blind" return "Niewidomy/Niewidoma"
-  if p is "deafBlind" return "Głuchoniewidomy"
-  if p is "motor" return "Ograniczona sprawność ruchowa"
-  return "Ogólny"
-
-function previewMessage(msg Message) returns Text
-  if msg.type is "text" return msg.body
-  if msg.type is "music" return "🎵 " + msg.musicMeta.title
-  if msg.type is "morse" return "Morse: " + msg.body
-  if msg.type is "sign" return "Migowy: " + msg.body
-  if msg.type is "image" return "Zdjęcie"
-  if msg.type is "voice" return "Wiadomość głosowa"
-  if msg.type is "alarm" return "POMOC"
-  return "Wiadomość"
-
-function statusIcon(status Text) returns Text
-  if status is "sending" return "○"
-  if status is "sent" return "✓"
-  if status is "delivered" return "✓✓"
-  if status is "read" return "✓✓"
-  if status is "failed" return "!"
-  return ""
-
-function formatTime(date Date) returns Text
-  return timeString(date)
-
-function formatRelative(date Date) returns Text
-  return relativeString(date)
-
-function formatDuration(ms Number) returns Text
-  return durationString(ms)
-
-function isSelected(c Contact) returns Boolean
-  return c in selected
-
-function showToast(message Text)
-  // system toast
-
-function showAlert(message Text)
-  // system alert
-
-function showNotification(message Text)
-  // local notification
-
-// ------------------------------------------------------------
-// APP ENTRY
-// ------------------------------------------------------------
-when app launches
-  load user
-  load profile
-  load settings
-  load providers
-  load contacts
-  load conversations
-  load authToken
-
-  if providers is empty
-    seedProviders()
-  if profile is none
-    seedDefaultProfile()
-  if settings is none
-    seedDefaultSettings()
-
-  if authToken is not none and currentUser is not none
-    call api "/auth/me" method GET
-    on success response
-      set currentUser = response.user
-      set isLoggedIn = true
-      set isAdminMode = currentUser.isAdmin
-      save user
-      go to MainTabs
-    on error
-      clear authToken
-      set currentUser = none
-      go to AuthGate
-  else
-    go to Onboarding
-// ============================================================
-// APPENDIX — Production Layer v1.5.1
-// E2EE • Offline queue • Morse decoder • Groups • SafetyNumbers
-// Recovery • Media encryption • Real AI calls • Sound alerts
-// Hardware switch • Tryb uproszczony • Emergency expiry • Watch
-// Dołączone na końcu app.ax — nic powyżej nie zmienione.
-// ============================================================
-
-// ------------------------------------------------------------
-// A. STORES — kolejka offline, klucze, weryfikacja
-// ------------------------------------------------------------
-store outbox local
-  list OutboxItem
-  key "axbridge.outbox.v6"
-  encrypted true
-
-store cryptoKeys local
-  list DeviceKey
-  key "axbridge.keys.v6"
-  encrypted true
-
-store verifiedPeers local
-  list VerifiedPeer
-  key "axbridge.verified.v6"
-
-store recoveryMeta local
-  single RecoveryMeta
-  key "axbridge.recovery.v6"
-  encrypted true
-
-store soundEvents local
-  list SoundEvent
-  key "axbridge.sounds.v6"
-
-store simplifiedPrefs local
-  single SimplifiedPrefs
-  key "axbridge.simple.v6"
-
-// ------------------------------------------------------------
-// B. MODELS — nowe typy
-// ------------------------------------------------------------
-data OutboxItem
-  id Text
-  idempotencyKey Text
-  conversationId Text
-  kind Text
-  ciphertext Text
-  mediaRef Text?
-  createdAt Date
-  attempts Number
-  nextRetryAt Date
-  status Text
-  lastError Text?
-  ttlSeconds Number
-
-data DeviceKey
-  userId Text
-  identityKeyPublic Text
-  identityKeyPrivate Text
-  signedPreKeyPublic Text
-  signedPreKeyPrivate Text
-  oneTimePreKeys List<OneTimeKey>
-  sessionKeys Json
-  createdAt Date
-  rotatedAt Date
-
-data OneTimeKey
-  id Number
-  public Text
-  private Text
-
-data VerifiedPeer
-  userId Text
-  safetyNumber Text
-  verifiedAt Date
-  method Text
-
-data RecoveryMeta
-  recoveryCodeHash Text
-  createdAt Date
-  usedAt Date?
-
-data SoundEvent
-  id Text
-  kind Text
-  confidence Number
-  receivedAt Date
-
-data SimplifiedPrefs
-  enabled Boolean
-  maxVisibleActions Number
-  hideAnimations Boolean
-  highContrastAuto Boolean
-  showOnlyPrimaryButton Boolean
-  confirmEveryAction Boolean
-
-data GroupSession
-  conversationId Text
-  memberKeys Json
-  rotationCount Number
-  lastRotatedAt Date
-
-// ------------------------------------------------------------
-// C. E2EE — prawdziwe prymitywy (X25519 + AES-GCM)
-// Wywoływane przez runtime natywny: ios crypto_kit / android jni.
-// Serwer nigdy nie widzi plaintextu.
-// ------------------------------------------------------------
-function generateIdentityKeyPair() returns Json
-  return crypto.x25519.generateKeyPair()
-
-function generateSignedPreKey(identityPrivate Text) returns Json
-  set kp = crypto.x25519.generateKeyPair()
-  set sig = crypto.ed25519.sign(identityPrivate, kp.public)
-  return { public: kp.public, private: kp.private, signature: sig }
-
-function generateOneTimePreKeys(count Number) returns List<Json>
-  set out = []
-  set i = 0
-  while i < count
-    add crypto.x25519.generateKeyPair() to out
-    set i = i + 1
-  return out
-
-function bootstrapCrypto(userId Text)
-  if cryptoKeys is not empty
-    return
-  set identity = generateIdentityKeyPair()
-  set signed = generateSignedPreKey(identity.private)
-  set otp = generateOneTimePreKeys(100)
-  set key = DeviceKey(
-    userId = userId,
-    identityKeyPublic = identity.public,
-    identityKeyPrivate = identity.private,
-    signedPreKeyPublic = signed.public,
-    signedPreKeyPrivate = signed.private,
-    oneTimePreKeys = otp.map(k => OneTimeKey(id = index, public = k.public, private = k.private)),
-    sessionKeys = {},
-    createdAt = now(),
-    rotatedAt = now()
-  )
-  add key to cryptoKeys
-  save cryptoKeys
-  call api "/keys/upload" method POST body {
-    identityKey: identity.public,
-    signedPreKey: signed.public,
-    signedPreKeySignature: signed.signature,
-    oneTimePreKeys: otp.map(k => k.public)
-  }
-
-function encryptForPeer(peerId Text, plaintext Text) returns Text
-  set my = cryptoKeys.first
-  set session = my.sessionKeys[peerId]
-  if session is none
-    session = crypto.x3dh.initiateSender(my, peerId)
-    my.sessionKeys[peerId] = session
-    save cryptoKeys
-  return crypto.aesgcm.encrypt(session.messageKey, plaintext)
-
-function decryptFromPeer(peerId Text, ciphertext Text) returns Text
-  set my = cryptoKeys.first
-  set session = my.sessionKeys[peerId]
-  if session is none
-    session = crypto.x3dh.initiateReceiver(my, peerId)
-    my.sessionKeys[peerId] = session
-    save cryptoKeys
-  return crypto.aesgcm.decrypt(session.messageKey, ciphertext)
-
-function rotateSessionIfNeeded(peerId Text)
-  set my = cryptoKeys.first
-  set session = my.sessionKeys[peerId]
-  if session is none
-    return
-  if session.messageCount >= 100 or daysBetween(session.createdAt, now()) >= 30
-    session = crypto.doubleRatchet.ratchet(session)
-    my.sessionKeys[peerId] = session
-    save cryptoKeys
-
-function computeSafetyNumber(peerId Text) returns Text
-  set my = cryptoKeys.first.identityKeyPublic
-  set their = my.sessionKeys[peerId].theirIdentityKey
-  set combined = sortLexicographic([my, their]).join(":")
-  set hash = crypto.sha256(combined)
-  return hash.toHex().chunk(5).take(12).join(" ")
-
-function verifyPeer(peerId Text, method Text)
-  remove VerifiedPeer(userId = peerId) from verifiedPeers
-  add VerifiedPeer(
-    userId = peerId,
-    safetyNumber = computeSafetyNumber(peerId),
-    verifiedAt = now(),
-    method = method
-  ) to verifiedPeers
-  save verifiedPeers
-  call api "/contacts/verify" method POST body { peerId: peerId, method: method }
-
-function isPeerVerified(peerId Text) returns Boolean
-  return verifiedPeers.any(v => v.userId is peerId)
-
-// ------------------------------------------------------------
-// D. OFFLINE QUEUE — FIFO z exponential backoff, przeżywa restart
-// ------------------------------------------------------------
-const MAX_RETRY = 10
-const BASE_DELAY_MS = 5000
-const MAX_DELAY_MS = 300000
-
-function enqueueOutbox(conversationId Text, kind Text, plaintext Text, mediaRef Text?, ttlSeconds Number)
-  set peerId = conversationIdToPeer(conversationId)
-  set ciphertext = encryptForPeer(peerId, plaintext)
-  set item = OutboxItem(
-    id = newId(),
-    idempotencyKey = newId(),
-    conversationId = conversationId,
-    kind = kind,
-    ciphertext = ciphertext,
-    mediaRef = mediaRef,
-    createdAt = now(),
-    attempts = 0,
-    nextRetryAt = now(),
-    status = "pending",
-    ttlSeconds = if ttlSeconds is none then 0 else ttlSeconds
-  )
-  add item to outbox
-  save outbox
-  kickQueue()
-  return item.id
-
-function kickQueue()
-  if isOnline is false
-    return
-  set pending = outbox.where(o => o.status is "pending" and o.nextRetryAt <= now())
-  for item in pending
-    sendOutboxItem(item)
-
-function sendOutboxItem(item OutboxItem)
-  set item.status = "sending"
-  save outbox
-  call api "/messages/send" method POST body {
-    id: item.id,
-    idempotencyKey: item.idempotencyKey,
-    conversationId: item.conversationId,
-    kind: item.kind,
-    ciphertext: item.ciphertext,
-    mediaRef: item.mediaRef,
-    ttlSeconds: item.ttlSeconds,
-    createdAt: item.createdAt
-  }
-  on success response
-    remove item from outbox
-    save outbox
-    upsertLocalMessage(item, "sent")
-  on error err
-    set item.attempts = item.attempts + 1
-    set item.lastError = err.message
-    if item.attempts >= MAX_RETRY
-      set item.status = "failed"
-    else
-      set delay = min(BASE_DELAY_MS * pow(2, item.attempts), MAX_DELAY_MS)
-      set item.nextRetryAt = now() + delay
-      set item.status = "pending"
-    save outbox
-
-function flushQueueOnReconnect()
-  set isOnline = true
-  set outbox = outbox.map(o =>
-    if o.status is "failed" then OutboxItem(o..., status = "pending", attempts = 0) else o
-  )
-  save outbox
-  kickQueue()
-
-when isOnline changes to true
-  flushQueueOnReconnect()
-
-// Timer: retry co 30s gdy online
-timer queueRetry
-  every 30s
-  if isOnline
-    kickQueue()
-
-// ------------------------------------------------------------
-// E. REAL API CLIENT — z tokenem, timeoutem, retry, refresh
-// ------------------------------------------------------------
-function apiCall(path Text, method Text, body Json?, timeoutMs Number = 15000) returns Json
-  set headers = {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer " + authToken,
-    "X-Device-Id": deviceFingerprint()
-  }
-  set res = http.request(
-    url = apiBaseUrl() + path,
-    method = method,
-    headers = headers,
-    body = body,
-    timeout = timeoutMs
-  )
-  if res.status is 401
-    refreshAuthToken()
-    return apiCall(path, method, body, timeoutMs)
-  if res.status >= 500
-    throw Error("E_SERVER", "Serwer chwilowo niedostępny")
-  if res.status >= 400
-    throw Error("E_CLIENT", res.body.message or "Błąd żądania")
-  return res.body
-
-function refreshAuthToken()
-  set res = http.request(
-    url = apiBaseUrl() + "/auth/refresh",
-    method = "POST",
-    headers = { "Content-Type": "application/json" },
-    body = { refreshToken: recoveryMeta?.refreshToken }
-  )
-  if res.status is not 200
-    logout()
-    throw Error("E_AUTH", "Sesja wygasła")
-  set authToken = res.body.token
-  save authToken
-
-function apiBaseUrl() returns Text
-  return "https://axbridge.axelgadomski.workers.dev"
-
-function deviceFingerprint() returns Text
-  return platform + ":" + persistentDeviceId()
-
-// ------------------------------------------------------------
-// F. MORSE DECODER — pełny, offline, z wibracjami i dźwiękiem
-// ------------------------------------------------------------
-const MORSE_TABLE = {
-  ".-": "A", "-...": "B", "-.-.": "C", "-..": "D", ".": "E",
-  "..-.": "F", "--.": "G", "....": "H", "..": "I", ".---": "J",
-  "-.-": "K", ".-..": "L", "--": "M", "-.": "N", "---": "O",
-  ".--.": "P", "--.-": "Q", ".-.": "R", "...": "S", "-": "T",
-  "..-": "U", "...-": "V", ".--": "W", "-..-": "X", "-.--": "Y",
-  "--..": "Z",
-  "-----": "0", ".----": "1", "..---": "2", "...--": "3", "....-": "4",
-  ".....": "5", "-....": "6", "--...": "7", "---..": "8", "----.": "9",
-  ".-.-.-": ".", "--..--": ",", "..--..": "?", "-..-.": "/", ".--.-.": "@"
-}
-
-function morseEncode(text Text) returns Text
-  set parts = []
-  for ch in upper(text).chars()
-    if ch is " "
-      add "/" to parts
-    else
-      set pattern = lookupMorse(ch)
-      if pattern is not none
-        add pattern to parts
-  return parts.join(" ")
-
-function morseDecode(morse Text) returns Text
-  set out = ""
-  for token in split(morse, " ")
-    if token is "/"
-      set out = out + " "
-    else if token is ""
-      continue
-    else
-      set ch = MORSE_TABLE[token]
-      set out = out + (ch or "?")
-  return out
-
-function lookupMorse(ch Text) returns Text?
-  for pair in MORSE_TABLE.entries()
-    if pair.value is ch
-      return pair.key
-  return none
-
-function playMorseVibration(morse Text, wpm Number, strength Number)
-  set unit = round(1200 / wpm)
-  set pattern = []
-  for ch in morse.chars()
-    if ch is "."
-      add unit to pattern
-      add unit to pattern
-    else if ch is "-"
-      add unit * 3 to pattern
-      add unit to pattern
-    else if ch is " "
-      add unit * 2 to pattern
-    else if ch is "/"
-      add unit * 4 to pattern
-  haptics.playPattern(pattern, amplitude = strength / 100)
-
-function playMorseTone(morse Text, wpm Number, freqHz Number = 700)
-  set unit = round(1200 / wpm)
-  set seq = []
-  for ch in morse.chars()
-    if ch is "."
-      add { durMs: unit, tone: freqHz } to seq
-      add { durMs: unit, tone: 0 } to seq
-    else if ch is "-"
-      add { durMs: unit * 3, tone: freqHz } to seq
-      add { durMs: unit, tone: 0 } to seq
-    else if ch is " "
-      add { durMs: unit * 2, tone: 0 } to seq
-    else if ch is "/"
-      add { durMs: unit * 4, tone: 0 } to seq
-  audio.playSequence(seq)
-
-// Detekcja dotykowa — user stuka w ekran, my mierzymy czasy
-screen MorseInput
-  title "Morse — nadawanie"
-  state buffer Text = ""
-  state lastTapAt Date? = none
-  state isDecoding Boolean = false
-
-  when screen appears
-    haptics.prepare()
-
-  column
-    padding 16
-    gap 14
-    text "Stukaj krótko (kropka) lub długo (kreska). Pauza 1s = koniec znaku."
-      color muted
-    card
-      padding 24
-      min height 120
-      text if buffer is empty then "…" else buffer
-        style mono
-        font size 26
-    touchArea
-      height 220
-      background surface2
-      radius medium
-      on tap
-        set nowTs = now()
-        set isLong = false
-        if lastTapAt is not none and (nowTs - lastTapAt) < 300
-          set isLong = true
-        set char = if isLong then "-" else "."
-        set buffer = buffer + char
-        set lastTapAt = nowTs
-        haptics.tap(intensity = if isLong then "medium" else "light")
-        scheduleAfter(1200ms, finalizeMorseChar())
-    row
-      gap 10
-      button "Spacja"
-        style buttonSecondary
-        grow true
-        when tapped
-          set buffer = buffer + " "
-          set lastTapAt = none
-      button "Koniec znaku"
-        style buttonSecondary
-        grow true
-        when tapped finalizeMorseChar()
-      button "Wyczyść"
-        style buttonGhost
-        when tapped set buffer = ""
-    card
-      text "Zdekodowano:"
-      text morseDecode(buffer)
-        style heading
-    row
-      gap 10
-      button "Wyślij jako tekst"
-        style buttonPrimary
-        grow true
-        disabled buffer is empty
-        when tapped
-          sendTranslatedText(morseDecode(buffer), replyTo)
-          set buffer = ""
-      button "Wibracje"
-        style buttonSecondary
-        when tapped playMorseVibration(buffer, profile.morseWpm, profile.vibrationStrength)
-      button "Dźwięk"
-        style buttonSecondary
-        when tapped playMorseTone(buffer, profile.morseWpm)
-
-function finalizeMorseChar()
-  // dodaje separator między znakami
-  if buffer is not empty and last character of buffer is not " "
-    set buffer = buffer + " "
-
-// ------------------------------------------------------------
-// G. TRYB NAUKI MORSE'A — krok po kroku
-// ------------------------------------------------------------
-screen MorseLearn
-  title "Nauka Morse'a"
-  state currentLetter Text = "A"
-  state answer Text = ""
-  state score Number = 0
-  state total Number = 0
-  state feedback Text = ""
-
-  column
-    padding 20
-    gap 16
-    text "Naucz się liter" style heading
-    card
-      text currentLetter style title align center
-    button "Odtwórz wzór (wibracje)"
-      style buttonSecondary
-      width full
-      when tapped playMorseVibration(morseEncode(currentLetter), profile.morseWpm, profile.vibrationStrength)
-    button "Odtwórz wzór (dźwięk)"
-      style buttonSecondary
-      width full
-      when tapped playMorseTone(morseEncode(currentLetter), profile.morseWpm)
-    field answer
-      label "Powtórz wzór"
-      placeholder "np. .- dla A"
-    if feedback is not empty
-      text feedback
-        color if feedback starts with "Dobrze" then success else danger
-        role alert
-    row
-      gap 10
-      button "Sprawdź"
-        style buttonPrimary
-        grow true
-        when tapped
-          set total = total + 1
-          if answer is morseEncode(currentLetter)
-            set score = score + 1
-            set feedback = "Dobrze! " + score + "/" + total
-            nextLetter()
-          else
-            set feedback = "Źle. Poprawnie: " + morseEncode(currentLetter)
-      button "Pomiń"
-        style buttonGhost
-        when tapped nextLetter()
-
-function nextLetter()
-  set letters = keys of MORSE_TABLE filtered single-char
-  set currentLetter = letters[random(0, letters.length - 1)]
-  set answer = ""
-
-// ------------------------------------------------------------
-// H. GRUPY (max 8) — sender keys + dystrybucja
-// ------------------------------------------------------------
-store groupSessions local
-  list GroupSession
-  key "axbridge.groups.v6"
-  encrypted true
-
-const MAX_GROUP_MEMBERS = 8
-
-function createGroup(name Text, memberIds List<Text>)
-  if memberIds.length + 1 > MAX_GROUP_MEMBERS
-    show alert "Maksymalnie 8 osób w grupie (MVP)."
-    return
-  call api "/conversations/group" method POST body {
-    title: name,
-    memberIds: memberIds
-  }
-  on success response
-    set conv = response.conversation
-    initiateGroupSenderKey(conv.id, memberIds)
-    go to Chat(conv)
-
-function initiateGroupSenderKey(conversationId Text, memberIds List<Text>)
-  set senderKey = crypto.x25519.generateKeyPair()
-  set distributions = []
-  for peerId in memberIds
-    set encryptedKey = encryptForPeer(peerId, senderKey.private)
-    add { peerId: peerId, encryptedKey: encryptedKey } to distributions
-  call api "/groups/" + conversationId + "/sender-key" method POST body {
-    distributions: distributions,
-    publicKey: senderKey.public
-  }
-  add GroupSession(
-    conversationId = conversationId,
-    memberKeys = { self: senderKey.public },
-    rotationCount = 0,
-    lastRotatedAt = now()
-  ) to groupSessions
-  save groupSessions
-
-function sendGroupMessage(conversationId Text, plaintext Text)
-  set session = groupSessions.first where conversationId = conversationId
-  set ciphertext = crypto.aesgcm.encryptWithSenderKey(session.selfKey, plaintext)
-  enqueueOutbox(conversationId, "text", ciphertext, none, 0)
-
-function rotateGroupKey(conversationId Text)
-  set session = groupSessions.first where conversationId = conversationId
-  if session is none
-    return
-  set session.rotationCount = session.rotationCount + 1
-  set session.lastRotatedAt = now()
-  set session.selfKey = crypto.x25519.generateKeyPair()
-  save groupSessions
-  call api "/groups/" + conversationId + "/rotate" method POST body {
-    publicKey: session.selfKey.public
-  }
-
-// ------------------------------------------------------------
-// I. SAFETY NUMBER — ekran weryfikacji (QR + 60 cyfr)
-// ------------------------------------------------------------
-screen SafetyNumber(peer Contact)
-  title "Zweryfikuj kontakt"
-  state qrData Text = ""
-  state inputCode Text = ""
-  state error Text = ""
-
-  when screen appears
-    set qrData = computeSafetyNumber(peer.user.id)
-
-  column
-    padding 20
-    gap 16
-    card
-      text "Safety Number" style heading
-      text qrData style mono font size 18 align center
-    qrCode qrData
-      size 220
-      alt "Kod QR do weryfikacji klucza"
-    text "Porównaj ten numer z numerem na urządzeniu rozmówcy — osobiście lub przez zaufany kanał."
-      color muted
-      align center
-    divider
-    text "Lub wpisz kod od rozmówcy:" style caption
-    field inputCode
-      label "60 cyfr"
-      placeholder "12345 67890 …"
-    if error is not empty
-      text error color danger role alert
-    row
-      gap 10
-      button "Zweryfikuj"
-        style buttonPrimary
-        grow true
-        disabled inputCode is empty
-        when tapped
-          if normalizeDigits(inputCode) is normalizeDigits(computeSafetyNumber(peer.user.id))
-            verifyPeer(peer.user.id, "manual")
-            show toast "Kontakt zweryfikowany"
-            go back
-          else
-            set error = "Kody różnią się — możliwy atak MITM. Nie kontynuuj."
-      button "Anuluj"
-        style buttonGhost
-        when tapped go back
-    if isPeerVerified(peer.user.id)
-      text "✓ Kontakt już zweryfikowany" color success align center
-
-function normalizeDigits(s Text) returns Text
-  return s.replace(" ", "").replace("-", "")
-
-// ------------------------------------------------------------
-// J. ODZYSKIWANIE KONTA — recovery code
-// ------------------------------------------------------------
-screen RecoveryCode
-  title "Kod odzyskiwania"
-  state code Text = ""
-  state isWorking Boolean = false
-  state confirmed Boolean = false
-
-  when screen appears
-    if recoveryMeta is none
-      set generated = generateRecoveryCode()
-      set recoveryMeta = RecoveryMeta(
-        recoveryCodeHash = crypto.sha256(generated),
-        createdAt = now()
-      )
-      save recoveryMeta
-      set code = generated
-      call api "/auth/recovery-code" method POST body {
-        hash: recoveryMeta.recoveryCodeHash
-      }
-
-  column
-    padding 24
-    gap 20
-    text "Zapisz ten kod" style title
-    text "To jedyny sposób na odzyskanie konta, jeśli zapomnisz hasła. Nie pokażemy go ponownie."
-      color muted
-    card
-      padding 20
-      text code style mono font size 22 align center
-    row
-      gap 10
-      button "Kopiuj"
-        style buttonSecondary
-        grow true
-        when tapped
-          clipboard.write(code)
-          show toast "Skopiowano"
-      button "Udostępnij"
-        style buttonSecondary
-        when tapped shareText(code)
-    checkbox confirmed
-      label "Zapisałem kod w bezpiecznym miejscu"
-      when changed value set confirmed = value
-    button "Kontynuuj"
-      style buttonPrimary
-      width full
-      height 56
-      disabled confirmed is false
-      when tapped go to MainTabs
-
-function generateRecoveryCode() returns Text
-  set groups = []
-  set i = 0
-  while i < 8
-    add randomHex(4).toUpperCase() to groups
-    set i = i + 1
-  return groups.join("-")
-
-function recoverAccountWithCode(email Text, code Text, newPassword Text)
-  set res = apiCall("/auth/recover", "POST", {
-    email: email,
-    recoveryCode: code,
-    newPassword: newPassword
-  }, 20000)
-  set authToken = res.token
-  set currentUser = res.user
-  set isLoggedIn = true
-  save authToken
-  save user
-  go to MainTabs
-
-// ------------------------------------------------------------
-// K. MEDIA — szyfrowanie przed uploadem, nagrywanie głosu
-// ------------------------------------------------------------
-function uploadEncryptedMedia(localFile File, kind Text) returns Json
-  set fileBytes = readBytes(localFile)
-  set mediaKey = crypto.randomBytes(32)
-  set iv = crypto.randomBytes(12)
-  set ciphertext = crypto.aesgcm.encryptRaw(mediaKey, iv, fileBytes)
-  set sha = crypto.sha256(ciphertext)
-  set upload = apiCall("/media/presign", "POST", {
-    sizeBytes: ciphertext.length,
-    mimeType: localFile.mime,
-    sha256: sha,
-    kind: kind
-  }, 30000)
-  http.put(upload.url, ciphertext)
-  return {
-    ref: upload.ref,
-    keyBase64: crypto.base64(mediaKey),
-    ivBase64: crypto.base64(iv),
-    mime: localFile.mime,
-    size: ciphertext.length,
-    durationMs: localFile.durationMs
-  }
-
-function sendVoiceMessage(audioFile File, reply Message?)
-  set enc = uploadEncryptedMedia(audioFile, "voice")
-  set payload = json({
-    kind: "voice",
-    media: enc,
-    replyToId: reply?.id
-  })
-  enqueueOutbox(activeConversation.id, "voice", payload, enc.ref, 0)
-
-screen VoiceRecorder
-  title "Nagrywanie"
-  state isRecording Boolean = false
-  state elapsedMs Number = 0
-  state waveform List<Number> = []
-  state recordedFile File? = none
-  state previewMs Number = 0
-
-  when screen appears
-    audio.requestMicPermission()
-    if microphonePermission is not "granted"
-      show alert "Potrzebujemy mikrofonu"
-
-  column
-    padding 20
-    gap 20
-    align center
-    text if isRecording then "Nagrywam…" else if recordedFile is not none then "Gotowe" else "Naciśnij"
-      style heading
-    circle
-      size 120
-      background if isRecording then danger else primary
-      text if isRecording then "■" else "●"
-        color white
-        font size 42
-      when tapped
-        if isRecording
-          set recordedFile = audio.stop()
-          set isRecording = false
-        else
-          set isRecording = true
-          set elapsedMs = 0
-          set waveform = []
-          audio.startRecording(onChunk = (chunk) =>
-            set elapsedMs = elapsedMs + 100
-            add chunk.amplitude to waveform
-          )
-    text formatDurationMs(elapsedMs) style mono font size 22
-    waveformView waveform
-      height 80
-    if recordedFile is not none
-      row
-        gap 10
-        button "Odtwórz"
-          style buttonSecondary
-          when tapped audio.playFile(recordedFile)
-        button "Wyślij"
-          style buttonPrimary
-          grow true
-          when tapped
-            sendVoiceMessage(recordedFile, replyTo)
-            go back
-        button "Nagraj ponownie"
-          style buttonGhost
-          when tapped
-            set recordedFile = none
-            set elapsedMs = 0
-            set waveform = []
-
-// ------------------------------------------------------------
-// L. REAL AI — tłumaczenie, TTS, STT, muzyka (BYO keys)
-// ------------------------------------------------------------
-function activeProvider(type Text) returns ProviderConfig?
-  set enabled = providers.where(p => p.enabled and p.type is type)
-  if enabled is empty
-    return none
-  return enabled.sortBy(p => p.priority).first
-
-function aiTranslate(text Text, targetLang Text) returns Text
-  set p = activeProvider("translate") or activeProvider("llm")
-  if p is none
-    return text
-  if p.id is "puter"
-    return puter.call("translate", { text: text, target: targetLang })
-  if p.id is "deepl"
-    return http.request(
-      url = "https://api-free.deepl.com/v2/translate",
-      method = "POST",
-      headers = { "Authorization": "DeepL-Auth-Key " + p.apiKey },
-      body = { text: [text], target_lang: upper(targetLang) }
-    ).body.translations[0].text
-  if p.id is "google-translate"
-    return http.request(
-      url = "https://translation.googleapis.com/language/translate/v2?key=" + p.apiKey,
-      method = "POST",
-      body = { q: text, target: targetLang }
-    ).body.data.translations[0].translatedText
-  // Generic OpenAI-compatible
-  return http.request(
-    url = (p.baseUrl or "https://api.openai.com/v1") + "/chat/completions",
-    method = "POST",
-    headers = { "Authorization": "Bearer " + p.apiKey },
-    body = {
-      model: p.model or "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Translate to " + targetLang + ". Output only translation." },
-        { role: "user", content: text }
-      ]
-    }
-  ).body.choices[0].message.content
-
-function aiSpeak(text Text, voice Text, rate Number)
-  set p = activeProvider("tts")
-  if p.id is "local-tts"
-    audio.tts.speak(text, voice = voice, rate = rate)
-    return
-  if p.id is "elevenlabs"
-    set audioBytes = http.request(
-      url = "https://api.elevenlabs.io/v1/text-to-speech/" + voice,
-      method = "POST",
-      headers = { "xi-api-key": p.apiKey },
-      body = { text: text },
-      responseType: "bytes"
-    )
-    audio.playBytes(audioBytes)
-    return
-
-function aiTranscribe(audioFile File, lang Text) returns Json
-  set p = activeProvider("stt")
-  if p.id is "whisper-local"
-    return whisper.runLocal(audioFile, lang)
-  return http.request(
-    url = "https://api.openai.com/v1/audio/transcriptions",
-    method = "POST",
-    headers = { "Authorization": "Bearer " + p.apiKey },
-    multipart: { file: audioFile, model: "whisper-1", language: lang }
-  ).body
-
-function aiGenerateMusic(prompt Text, mood Text, provider Text) returns MusicMeta
-  if provider is "puter"
-    set url = puter.call("generateMusic", { prompt: prompt, mood: mood })
-    return MusicMeta(
-      title = left(prompt, 32),
-      provider = "puter-music",
-      prompt = prompt,
-      mood = mood,
-      durationMs = 30000,
-      isGenerated = true,
-      r2Key = url
-    )
-  if provider is "suno"
-    set p = providers.first where id is "suno"
-    set res = http.request(
-      url = "https://api.sunoapi.org/api/v1/generate",
-      method = "POST",
-      headers = { "Authorization": "Bearer " + p.apiKey },
-      body = { prompt: prompt, tags: mood }
-    ).body
-    return MusicMeta(
-      title = left(prompt, 32),
-      provider = "suno",
-      prompt = prompt,
-      mood = mood,
-      durationMs = res.durationMs or 0,
-      isGenerated = true,
-      r2Key = res.audio_url
-    )
-  // Fallback
-  return MusicMeta(
-    title = left(prompt, 32),
-    provider = provider,
-    prompt = prompt,
-    mood = mood,
-    durationMs = 20000,
-    isGenerated = true
-  )
-
-// ------------------------------------------------------------
-// M. SPEECH-TO-TEXT — realne wywołanie z edycją przed wysłaniem
-// ------------------------------------------------------------
-screen SpeechToText
-  title "Mowa → tekst"
-  state isRecording Boolean = false
-  state transcript Text = ""
-  state confidence Number = 0
-  state processing Text = "on-device"
-  state recordedFile File? = none
-  state isWorking Boolean = false
-
-  column
-    padding 20
-    gap 16
-    text if isRecording then "Słucham…" else "Gotowe do nagrania"
-      style heading
-      align center
-    circle
-      size 100
-      background if isRecording then danger else primary
-      when tapped
-        if isRecording
-          set recordedFile = audio.stop()
-          set isRecording = false
-          set isWorking = true
-          set res = aiTranscribe(recordedFile, "pl")
-          set transcript = res.text
-          set confidence = res.confidence or 0.9
-          set processing = res.processing or "on-device"
-          set isWorking = false
-        else
-          set isRecording = true
-          audio.startRecording()
-    if isWorking
-      spinner
-      text "Przetwarzam…" color muted
-    if transcript is not empty
-      card
-        text "Rozpoznano (" + processing + ")" style caption
-        text transcript style body
-        if confidence < 0.8
-          text "Niska pewność — sprawdź przed wysłaniem." color warning
-      field transcript
-        label "Edytuj przed wysłaniem"
-        multiline
-      row
-        gap 10
-        button "Wyślij"
-          style buttonPrimary
-          grow true
-          when tapped
-            sendTranslatedText(transcript, replyTo)
-            go back
-        button "Anuluj"
-          style buttonGhost
-          when tapped go back
-
-// ------------------------------------------------------------
-// N. SOUND CLASSIFIER — alerty wizualne i wibracyjne
-// ------------------------------------------------------------
-const SUPPORTED_SOUNDS = ["doorbell", "alarm", "siren", "knock", "dog_bark", "smoke_alarm", "phone_ring", "baby_cry"]
-
-function startSoundMonitoring()
-  if microphonePermission is not "granted"
-    return
-  audio.startBackgroundClassifier(
-    onEvent = (event) =>
-      if event.confidence < 0.7
-        return
-      add SoundEvent(
-        id = newId(),
-        kind = event.label,
-        confidence = event.confidence,
-        receivedAt = now()
-      ) to soundEvents
-      if soundEvents.length > 100
-        remove soundEvents.first
-      save soundEvents
-      showSoundAlert(event)
-  )
-
-function showSoundAlert(event Json)
-  set label = soundLabelPl(event.label)
-  if profile.preferredOutput is "vibration" or profile.preferredOutput is "morse"
-    haptics.playPattern(patternForSound(event.label), amplitude = profile.vibrationStrength / 100)
-  else
-    haptics.playPattern(patternForSound(event.label), amplitude = profile.vibrationStrength / 100)
-    if profile.ttsVoice is not none
-      audio.tts.speak("Wykryto dźwięk: " + label)
-
-function patternForSound(kind Text) returns List<Number>
-  if kind is "smoke_alarm" return [500, 200, 500, 200, 500, 200, 500]
-  if kind is "siren" return [300, 100, 300, 100, 300, 100]
-  if kind is "doorbell" return [200, 100, 200]
-  if kind is "knock" return [100, 80, 100, 80, 100]
-  return [150]
-
-function soundLabelPl(k Text) returns Text
-  if k is "doorbell" return "Dzwonek do drzwi"
-  if k is "alarm" return "Alarm"
-  if k is "siren" return "Syrena"
-  if k is "knock" return "Pukanie"
-  if k is "dog_bark" return "Szczekanie psa"
-  if k is "smoke_alarm" return "Alarm pożarowy"
-  if k is "phone_ring" return "Dzwoni telefon"
-  if k is "baby_cry" return "Płacz dziecka"
-  return k
-
-screen SoundAlerts
-  title "Alerty dźwiękowe"
-  column
-    padding 16
-    gap 12
-    text "Wykrywanie dźwięków otoczenia" style heading
-    text "Aplikacja rozpoznaje wybrane dźwięki i wibruje lub pokazuje alert wizualny."
-      color muted
-    toggle settings.notificationsEnabled
-      label "Włącz monitorowanie dźwięków"
-      when changed value
-        if value then startSoundMonitoring() else audio.stopBackgroundClassifier()
-    list soundEvents
-      empty
-        text "Brak zdarzeń" color muted
-      item e
-        row
-          text soundLabelPl(e.kind)
-          spacer
-          text formatRelative(e.receivedAt) style caption
-    if soundEvents is not empty
-      button "Wyczyść historię"
-        style buttonGhost
-        when tapped
-          clear soundEvents
-          save soundEvents
-
-// ------------------------------------------------------------
-// O. CONTACT VERIFICATION FLOW — rozszerzenie AddContact
-// ------------------------------------------------------------
-screen ContactDetail(contact Contact)
-  title contact.displayName
-  column
-    padding 16
-    gap 14
-    avatar contact.user size 96
-    text contact.user.displayName style heading align center
-    text contact.user.publicId style mono color muted align center
-    if isPeerVerified(contact.user.id)
-      card
-        text "✓ Zweryfikowany" color success
-        text "Safety Number: " + computeSafetyNumber(contact.user.id) style mono font size 12
-    else
-      card
-        text "Niezweryfikowany" color warning
-        text "Zweryfikuj klucz, aby wykluczyć atak MITM." color muted
-        button "Zweryfikuj"
-          style buttonPrimary
-          when tapped go to SafetyNumber(contact)
-    toggle contact.canReceiveAlarm
-      label "Może otrzymywać tryb Pomoc"
-      when changed value
-        update contact.canReceiveAlarm = value
-        save contacts
-    button "Zgłoś nadużycie"
-      style buttonDanger
-      width full
-      when tapped go to ReportAbuse(contact)
-    button "Zablokuj kontakt"
-      style buttonDanger
-      width full
-      when tapped
-        call api "/contacts/block" method POST body { peerId: contact.user.id }
-        remove contact from contacts
-        save contacts
-        go back
-
-screen ReportAbuse(contact Contact)
-  title "Zgłoś nadużycie"
-  state reason Text = ""
-  state details Text = ""
-  state isWorking Boolean = false
-
-  column
-    padding 20
-    gap 16
-    segmented reason
-      options spam, harassment, scam, illegal, other
-      labels "Spam", "Nękanie", "Oszustwo", "Nielegalne", "Inne"
-    field details
-      label "Opis (opcjonalnie)"
-      multiline
-    button if isWorking then "Wysyłam…" else "Wyślij zgłoszenie"
-      style buttonDanger
-      width full
-      height 56
-      disabled reason is empty
-      when tapped
-        set isWorking = true
-        call api "/reports" method POST body {
-          peerId: contact.user.id,
-          reason: reason,
-          details: details,
-          context: activeConversation?.id
-        }
-        on success
-          set isWorking = false
-          show toast "Zgłoszenie wysłane. Dziękujemy."
-          go back
-        on error
-          set isWorking = false
-          show alert "Nie udało się wysłać zgłoszenia"
-
-// ------------------------------------------------------------
-// P. USUWANIE KONTA + EKSPORT
-// ------------------------------------------------------------
-screen DeleteAccount
-  title "Usuń konto"
-  state password Text = ""
-  state confirmation Text = ""
-  state isWorking Boolean = false
-  state error Text = ""
-
-  column
-    padding 20
-    gap 16
-    text "To działanie jest nieodwracalne" style heading color danger
-    text "Usuniemy Twoje konto, wiadomości i wszystkie dane. Kopie zapasowe zostaną zniszczone w ciągu 30 dni."
-      color muted
-    field password
-      label "Potwierdź hasłem"
-      type password
-    field confirmation
-      label "Wpisz DELETE"
-      placeholder "DELETE"
-    if error is not empty
-      text error color danger role alert
-    button "Usuń konto trwale"
-      style buttonDanger
-      width full
-      height 56
-      disabled password is empty or confirmation is not "DELETE"
-      when tapped
-        set isWorking = true
-        call api "/account/delete" method DELETE body {
-          password: password,
-          confirm: "DELETE"
-        }
-        on success
-          clearAllLocalData()
-          set isWorking = false
-          go to Onboarding
-        on error err
-          set error = err.message
-          set isWorking = false
-
-function clearAllLocalData()
-  clear profile
-  clear user
-  clear contacts
-  clear conversations
-  clear messages
-  clear communities
-  clear tiktak
-  clear providers
-  clear settings
-  clear musicCache
-  clear emergencyHistory
-  clear authToken
-  clear outbox
-  clear cryptoKeys
-  clear verifiedPeers
-  clear recoveryMeta
-  clear soundEvents
-  clear groupSessions
-
-function exportMyData()
-  set res = apiCall("/me/export", "GET", none, 60000)
-  set file = writeTempFile("axbridge-export-" + formatDate(now()) + ".json", json(res))
-  shareFile(file)
-
-// ------------------------------------------------------------
-// Q. TRYB UPROSZCZONY — dla osób z przeciążeniem poznawczym
-// ------------------------------------------------------------
-function seedSimplifiedIfNeeded()
-  if simplifiedPrefs is none
-    set simplifiedPrefs = SimplifiedPrefs(
-      enabled = false,
-      maxVisibleActions = 2,
-      hideAnimations = true,
-      highContrastAuto = false,
-      showOnlyPrimaryButton = true,
-      confirmEveryAction = true
-    )
-    save simplifiedPrefs
-
-screen SimplifiedModeSettings
-  title "Tryb uproszczony"
-  column
-    padding 16
-    gap 14
-    text "Mniej opcji, mniej bodźców, większa przewidywalność."
-      color muted
-    toggle simplifiedPrefs.enabled
-      label "Włącz tryb uproszczony"
-    toggle simplifiedPrefs.hideAnimations
-      label "Ukryj animacje"
-    toggle simplifiedPrefs.highContrastAuto
-      label "Wymuś wysoki kontrast"
-    toggle simplifiedPrefs.showOnlyPrimaryButton
-      label "Tylko główny przycisk"
-    toggle simplifiedPrefs.confirmEveryAction
-      label "Potwierdzaj każdą akcję"
-    text "Maksymalna liczba widocznych akcji: " + simplifiedPrefs.maxVisibleActions
-    slider simplifiedPrefs.maxVisibleActions min 1 max 4 step 1
-    button "Zapisz"
-      style buttonPrimary
-      width full
-      when tapped
-        save simplifiedPrefs
-        applySimplified()
-        go back
-
-function applySimplified()
-  if simplifiedPrefs.enabled
-    set profile.highContrast = simplifiedPrefs.highContrastAuto or profile.highContrast
-    set profile.reduceMotion = simplifiedPrefs.hideAnimations
-    set profile.confirmBeforeSend = simplifiedPrefs.confirmEveryAction or profile.confirmBeforeSend
-    save profile
-
-when app launches
-  seedSimplifiedIfNeeded()
-  applySimplified()
-
-// ------------------------------------------------------------
-// R. HARDWARE SWITCH — alternatywa dla gestów (przełącznik)
-// ------------------------------------------------------------
-function registerHardwareSwitchListener()
-  hardware.onSwitchEvent((event) =>
-    if event.type is "long_press" and event.duration >= 3000
-      if activeConversation is none
-        go to Emergency
-      else
-        go to Emergency
-    else if event.type is "single_press"
-      if currentScreen is "Conversations"
-        go to Conversations
-      else
-        go back
-    else if event.type is "double_press"
-      go to SettingsHub
-  )
-
-when app launches
-  registerHardwareSwitchListener()
-
-// ------------------------------------------------------------
-// S. EMERGENCY EXPIRY — automatyczne wygaszenie lokalizacji
-// ------------------------------------------------------------
-function scheduleEmergencyExpiry(eventId Text, expiresAt Date)
-  scheduleAt(expiresAt, () =>
-    set ev = emergencyHistory.first where id is eventId
-    if ev is not none and ev.status is "active"
-      set ev.status = "expired"
-      set ev.latitude = none
-      set ev.longitude = none
-      set ev.locationShared = false
-      save emergencyHistory
-      call api "/emergency/" + eventId + "/expire" method POST
-      show notification "Tryb Pomoc wygasł — lokalizacja nie jest już udostępniana"
-  )
-
-function triggerEmergencyConfirmed(contacts List<Contact>, message Text, withLocation Boolean, durationMin Number)
-  set durationSec = durationMin * 60
-  set payload = {
-    message: message,
-    locationShared: withLocation,
-    durationSeconds: durationSec
-  }
-  if withLocation
-    set loc = location.getCurrent(precision = "approximate")
-    payload.latitude = loc.latitude
-    payload.longitude = loc.longitude
-  call api "/emergency/trigger" method POST body {
-    recipientIds: contacts.map(c => c.user.id),
-    confirmed: true,
-    payload: payload
-  }
-  on success response
-    set eventId = response.eventId
-    set expiresAt = response.expiresAt
-    add EmergencyEvent(
-      id = eventId,
-      initiatorId = currentUser.id,
-      message = message,
-      locationShared = withLocation,
-      latitude = payload.latitude,
-      longitude = payload.longitude,
-      expiresAt = expiresAt,
-      status = "active",
-      createdAt = now(),
-      recipientIds = contacts.map(c => c.user.id)
-    ) to emergencyHistory
-    save emergencyHistory
-    scheduleEmergencyExpiry(eventId, expiresAt)
-  on error err
-    // Kolejkuj offline — wyślemy po powrocie sieci
-    add OutboxItem(
-      id = newId(),
-      idempotencyKey = newId(),
-      conversationId = "__emergency__",
-      kind = "alarm",
-      ciphertext = json(payload),
-      createdAt = now(),
-      attempts = 0,
-      nextRetryAt = now(),
-      status = "pending",
-      ttlSeconds = durationSec
-    ) to outbox
-    save outbox
-    show notification "Brak sieci — wezwanie wyśle się po połączeniu"
-
-// ------------------------------------------------------------
-// T. WATCH ALERTS — Wear OS / watchOS
-// ------------------------------------------------------------
-function sendWatchAlert(title Text, body Text, priority Text)
-  watch.sendAlert(
-    title = title,
-    body = body,
-    priority = priority,
-    actions = [
-      { id: "ack", label: "OK" },
-      { id: "sos", label: "Pomoc", destructive: true }
-    ]
-  )
-
-function onWatchAction(actionId Text)
-  if actionId is "ack"
-    return
-  if actionId is "sos"
-    go to Emergency
-
-// ------------------------------------------------------------
-// U. ACCESSIBILITY — runtime helpers (kontrast, focus, announce)
-// ------------------------------------------------------------
-function ensureContrast(fgHex Text, bgHex Text) returns Text
-  set ratio = contrastRatio(fgHex, bgHex)
-  if ratio >= 4.5
-    return fgHex
-  // Automatycznie przyciemnij lub rozjaśnij
-  return adjustForContrast(fgHex, bgHex, target = 4.5)
-
-function announceLive(message Text)
-  a11y.announce(message, politeness = "polite")
-
-function announceUrgent(message Text)
-  a11y.announce(message, politeness = "assertive")
-
-function focusTo(id Text)
-  a11y.focusElement(id)
-
-// Każdy ekran ogłasza swój tytuł przy wejściu
-when screen changes to screenName Text
-  announceLive(screenName)
-
-// ------------------------------------------------------------
-// V. SEKCJA DEBUG (tylko dev build)
-// ------------------------------------------------------------
-if build.isDebug
-  screen DebugTools
-    title "Debug"
-    column
-      padding 16
-      gap 10
-      button "Wyczyść outbox"
-        when tapped
-          clear outbox
-          save outbox
-      button "Wymuś flush queue"
-        when tapped kickQueue()
-      button "Rotuj wszystkie sesje"
-        when tapped
-          for peer in verifiedPeers
-            rotateSessionIfNeeded(peer.userId)
-      button "Pokaż mój safety number"
-        when tapped
-          show alert cryptoKeys.first.identityKeyPublic
-      button "Wygeneruj testowe dane"
-        when tapped seedTestData()
-
-function seedTestData()
-  // Testowa rozmowa z lokalnymi wiadomościami
-  set fakeUser = User(
-    id = "test-peer-1",
-    publicId = "AXB-TEST-0001",
-    email = "test@axbridge.dev",
-    displayName = "Testowy Kontakt",
-    publicKey = "",
-    persona = "general",
-    preferredLang = "pl",
-    isAdmin = false,
-    isVerified = true,
-    createdAt = now(),
-    profileCompleted = true
-  )
-  set conv = Conversation(
-    id = "test-conv-1",
-    type = "direct",
-    participants = [currentUser, fakeUser],
-    unreadCount = 0,
-    isPinned = false,
-    isMuted = false,
-    translationEnabled = true,
-    updatedAt = now(),
-    createdAt = now()
-  )
-  add conv to conversations
-  save conversations
-
-// ------------------------------------------------------------
-// KONIEC DOPISKU
-// Wersja: 1.5.1-production-appendix
-// ============================================================
+        call api
+          path "/api/emergency"
+          method "DELETE"
+          on success
+            show toast "Alarm anulowany"
+          on error
+            set lastError = "Nie udało się anulować"
+
+    if lastError is not ""
+      text lastError
+        color danger
+        accessibility label "Komunikat błędu"

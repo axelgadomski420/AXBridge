@@ -22,14 +22,10 @@ id = "87d4fd94c6114923b3ef02ae7069115c"
 binding = "AL_BUCKET"
 bucket_name = "al2100"
 
-[[queues.producers]]
-binding = "AL_QUEUE"
-queue = "al2100beta"
-
-[[queues.consumers]]
-queue = "al2100beta"
-max_batch_size = 10
-max_retries = 3
-
 [ai]
 binding = "AI"
+
+# Opcjonalna kolejka – odkomentuj po utworzeniu (npx wrangler queues create al2100beta):
+# [[queues.producers]]
+# binding = "AL_QUEUE"
+# queue = "al2100beta"

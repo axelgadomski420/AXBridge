@@ -1,7 +1,7 @@
 /**
  * AXBridge Ultra – Cloudflare Worker (production)
  * Admin: axelgadomski@icloud.com
- * Bindings: AL_DB, AL_KV, AL_BUCKET, AL_QUEUE, AI, ASSETS
+ * Bindings: AL_DB, AL_KV, AL_BUCKET, AL_QUEUE (optional), AI, ASSETS
  */
 
 export default {
@@ -107,6 +107,10 @@ async function translate(request, env) {
 
 async function queueMusic(request, env) {
   const body = await request.json();
+  if (!env.AL_QUEUE) {
+    // Kolejka nie jest zbindowana – nie wywalamy requestu, tylko oznaczamy status
+    return json({ status: "queued-local", note: "AL_QUEUE not bound; music marked without queue processing" });
+  }
   await env.AL_QUEUE.send({
     prompt: body.prompt,
     mood: body.mood || "happy",

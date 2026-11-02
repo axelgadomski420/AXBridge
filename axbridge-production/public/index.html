@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#7C3AED" />
+<title>AXBridge Ultra</title>
+<link rel="icon" href="/favicon.svg" />
+<style>
+  :root{
+    --primary:#7C3AED; --primary-dark:#6D28D9; --accent:#06B6D4; --danger:#DC2626;
+    --success:#16A34A; --warning:#D97706;
+    --bg:#0A0A0B; --surface:#18181B; --surface2:#27272A; --border:#3F3F46;
+    --text:#FAFAFA; --muted:#A1A1AA; --radius:14px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#FAFAFA; --surface:#FFFFFF; --surface2:#F4F4F5; --border:#E4E4E7; --text:#09090B; --muted:#71717A; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  button{font:inherit;cursor:pointer;border:none;border-radius:var(--radius);padding:12px 18px;font-weight:600}
+  .btn-primary{background:var(--primary);color:#fff;width:100%;min-height:52px}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-secondary{background:var(--surface2);color:var(--text);width:100%;min-height:52px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .muted{color:var(--muted)}
+  input,textarea,select{font:inherit;width:100%;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+  .screen{max-width:640px;margin:0 auto;padding:24px 16px 96px}
+  h1{font-size:1.6rem} h2{font-size:1.15rem;margin-top:0}
+  .tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--surface);border-top:1px solid var(--border);z-index:10}
+  .tabs button{flex:1;background:none;color:var(--muted);border-radius:0;padding:10px 4px;font-size:.7rem;min-height:56px}
+  .tabs button.active{color:var(--primary);font-weight:700}
+  .tabs button span{display:block;font-size:1.2rem}
+  .row{display:flex;gap:8px;align-items:center}
+  .bubble{max-width:80%;padding:10px 14px;border-radius:var(--radius);margin:4px 0}
+  .bubble.me{background:var(--primary);color:#fff;margin-left:auto}
+  .bubble.them{background:var(--surface2)}
+  .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#7c3aed33;color:#c4b5fd;font-size:.75rem}
+  .pill{background:var(--surface2);border-radius:999px;padding:8px 14px;cursor:pointer;font-size:.85rem}
+  .pill.active{background:var(--primary);color:#fff}
+  .err{color:var(--danger);min-height:1.2rem}
+  .back{background:none;color:var(--muted);padding:8px;width:auto;min-height:0}
+</style>
+</head>
+<body>
+<div id="app" class="screen"></div>
+<nav class="tabs" id="tabs" style="display:none"></nav>
+<script>
+"use strict";
+const API = ""; // same-origin: worker serwuje i frontend, i API
+const LS = "axbridge.v3";
+let S = JSON.parse(localStorage.getItem(LS) || "null") || {
+  step:1, user:null, persona:"general", autoTranslate:true, showBoth:true,
+  targetLang:"en", conversations:[], tiktak:[], music:[], view:"onboarding"
+};
+
+function save(){ localStorage.setItem(LS, JSON.stringify(S)); }
+function esc(s){ const d=document.createElement("div"); d.textContent=s??""; return d.innerHTML; }
+function setView(v, arg){ S.view=v; S.viewArg=arg; save(); render(); }
+
+async function api(path, opts={}){
+  const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
+  if(S.user) headers["X-User-Email"] = S.user.email;
+  try{
+    const r = await fetch(API+path, Object.assign({}, opts, {headers}));
+    return await r.json();
+  }catch(e){ return {offline:true, error:String(e)}; }
+}
+
+const PERSONAS = {
+  deaf:["Głuchy / Głucha","sign"], mute:["Niemy / Niema","text"], deafMute:["Głuchoniemy","morse"],
+  blind:["Niewidomy / Niewidoma","speech"], deafBlind:["Głuchoniewidomy","morse"], motor:["Ograniczona sprawność ruchowa","text"], general:["Ogólny","text"]
+};
+
+// ---------- Widoki ----------
+function render(){
+  const app = document.getElementById("app");
+  const tabs = document.getElementById("tabs");
+  if(!S.user){ tabs.style.display="none"; app.innerHTML = viewAuth(); bindAuth(); return; }
+  tabs.style.display="flex";
+  tabs.innerHTML = ["conversations","tiktak","music","settings","profile"].map(t =>
+    `<button data-tab="${t}" class="${S.view===t?'active':''}"><span>${({conversations:"💬",tiktak:"✨",music:"🎵",settings:"⚙️",profile:"👤"})[t]}</span>${({conversations:"Rozmowy",tiktak:"TikTak",music:"Muzyka",settings:"Ustawienia",profile:"Profil"})[t]}</button>`
+  ).join("");
+  tabs.querySelectorAll("button").forEach(b=>b.onclick=()=>setView(b.dataset.tab));
+  const views = {conversations:viewConversations, chat:viewChat, tiktak:viewTikTak, music:viewMusic, settings:viewSettings, profile:viewProfile, admin:viewAdmin};
+  app.innerHTML = (views[S.view]||viewConversations)(S.viewArg);
+  bind();
+}
+
+function viewAuth(){
+  if(S.view==="register"){
+    return `<h1>Utwórz konto</h1>
+    <p><label>Pseudonim<br><input id="nick" placeholder="Jak mamy Cię wyświetlać?"></label></p>
+    <p><label>E-mail<br><input id="email" type="email" placeholder="jan@email.com"></label></p>
+    <p><label>Hasło<br><input id="pass" type="password" placeholder="min. 8 znaków"></label></p>
+    <p class="err" id="err"></p>
+    <button class="btn-primary" id="doReg">Zarejestruj się</button>
+    <p></p><button class="btn-secondary" onclick="setView('login')">Mam już konto</button>`;
+  }
+  if(S.view==="login"){
+    return `<h1>Logowanie</h1>
+    <p><label>E-mail<br><input id="email" type="email"></label></p>
+    <p><label>Hasło<br><input id="pass" type="password"></label></p>
+    <p class="err" id="err"></p>
+    <button class="btn-primary" id="doLogin">Zaloguj</button>
+    <p></p><button class="btn-secondary" onclick="setView('register')">Nie mam konta</button>`;
+  }
+  // onboarding
+  return `<h1>AXBridge Ultra</h1><p class="muted">Komunikator dla każdego. Tekst, mowa, Morse, muzyka i zabawa.</p>
+  <h2>Kim jesteś?</h2>` +
+  Object.entries(PERSONAS).map(([k,v])=>`<p><button class="btn-secondary" onclick="pickPersona('${k}')">${v[0]}</button></p>`).join("");
+}
+
+function bindAuth(){
+  const reg = document.getElementById("doReg");
+  if(reg) reg.onclick = ()=>{
+    const nick=document.getElementById("nick").value.trim(), email=document.getElementById("email").value.trim(), pass=document.getElementById("pass").value;
+    const err=document.getElementById("err");
+    if(!nick||!email||pass.length<8){ err.textContent="Uzupełnij pola (hasło min. 8 znaków)"; return; }
+    S.user={nick,email,persona:S.persona,isAdmin:email==="axelgadomski@icloud.com",publicId:"AXB-"+Math.random().toString(36).slice(2,8).toUpperCase()};
+    if(S.conversations.length===0) S.conversations=[{id:"c1",name:"Przyjaciel",messages:[]}];
+    setView("conversations");
+  };
+  const login = document.getElementById("doLogin");
+  if(login) login.onclick = ()=>{
+    const email=document.getElementById("email").value.trim(), pass=document.getElementById("pass").value;
+    const err=document.getElementById("err");
+    if(!email||pass.length<8){ err.textContent="Uzupełnij pola"; return; }
+    S.user={nick:email.split("@")[0],email,persona:S.persona,isAdmin:email==="axelgadomski@icloud.com",publicId:"AXB-"+Math.random().toString(36).slice(2,8).toUpperCase()};
+    if(S.conversations.length===0) S.conversations=[{id:"c1",name:"Przyjaciel",messages:[]}];
+    setView("conversations");
+  };
+}
+function pickPersona(k){ S.persona=k; setView(S.view); setView("register"); }
+
+function viewConversations(){
+  return `<h1>Rozmowy</h1>` +
+  (S.conversations.length===0 ? `<div class="card"><h2>Brak rozmów</h2><p class="muted">Dodaj kontakt, żeby zacząć.</p><button class="btn-primary" onclick="addContact()">Dodaj kontakt</button></div>` :
+  S.conversations.map(c=>{
+    const last = c.messages[c.messages.length-1];
+    return `<p><div class="card row" style="cursor:pointer" onclick="setView('chat','${c.id}')">
+      <div style="width:42px;height:42px;border-radius:999px;background:var(--primary);display:grid;place-items:center;font-weight:700">${esc(c.name[0]||"?")}</div>
+      <div style="flex:1"><b>${esc(c.name)}</b><br><span class="muted">${last?esc(last.type==="morse"?"Morse":(last.body||"").slice(0,40)):"Nowa rozmowa"}</span></div></div></p>`;
+  }).join("")) +
+  `<p><button class="btn-secondary" onclick="addContact()">+ Nowa rozmowa</button></p>`;
+}
+function addContact(){ const n=prompt("Nazwa kontaktu:"); if(n&&n.trim()){ S.conversations.push({id:"c"+Date.now(),name:n.trim(),messages:[]}); save(); render(); } }
+
+function conv(id){ return S.conversations.find(c=>c.id===id); }
+
+function viewChat(id){
+  const c = conv(id); if(!c) return "<p>Nie ma takiej rozmowy.</p>";
+  return `<p class="row"><button class="back" onclick="setView('conversations')">← Wróć</button> <b>${esc(c.name)}</b></p>
+  <div style="min-height:40vh" id="msgs">` +
+  c.messages.map(m=>`<div class="bubble ${m.mine?'me':'them'}">
+    ${m.translated&&S.showBoth?`<div class="muted" style="font-size:.8rem;margin-top:4px">${esc(m.translated)}</div>`:""}
+    <div>${m.type==="morse"?"<code>"+esc(m.body)+"</code>":esc(m.body)}</div>
+    ${m.mood?`<div class="muted" style="font-size:.8rem">🎵 ${esc(m.mood)}</div>`:""}
+  </div>`).join("") + `</div>
+  <p class="row"><input id="draft" placeholder="Napisz wiadomość…" onkeydown="if(event.key==='Enter')sendMsg('${id}')">
+  <button class="btn-primary" style="width:auto" onclick="sendMsg('${id}')">➤</button></p>
+  <p class="row"><button class="pill" onclick="sendMorse('${id}')">· · − Morse</button>
+  <button class="pill" onclick="sendMood('${id}')">🎵 Wyślij nastrój</button></p>`;
+}
+async function sendMsg(id){
+  const c=conv(id), el=document.getElementById("draft"); const body=el.value.trim(); if(!body) return;
+  el.value="";
+  let translated=null;
+  if(S.autoTranslate){
+    const r = await api("/api/translate",{method:"POST",body:JSON.stringify({text:body,targetLang:S.targetLang,sourceLang:"pl"})});
+    translated = r.translated || ("["+S.targetLang.toUpperCase()+"] "+body);
+  }
+  c.messages.push({body,translated,mine:true,type:"text",ts:Date.now()});
+  save(); render();
+}
+function sendMorse(id){
+  const m = prompt("Wpisz kod Morse (np. .... .. .-.-.-):");
+  if(!m) return; conv(id).messages.push({body:m,type:"morse",mine:true,ts:Date.now()}); save(); render();
+}
+async function sendMood(id){
+  const mood = prompt("Nastrój (happy/calm/energetic/sad/funny/love):","happy");
+  if(!mood) return;
+  const r = await api("/api/music/generate",{method:"POST",body:JSON.stringify({prompt:"Emocja: "+mood,mood,provider:"puter",userId:S.user.email})});
+  conv(id).messages.push({body:"🎵 Muzyka – "+mood,mood,type:"music",mine:true,ts:Date.now(),queued:!!r.status});
+  save(); render();
+}
+
+async function viewTikTak(){
+  const r = await api("/api/tiktak");
+  const posts = (r.posts||[]).map(p=>`<p><div class="card"><b>${esc(p.author_id||"Ktoś")}</b><br><span>${esc(p.caption||"")}</span><br><span class="muted">${p.is_funny?"😂 zabawne":""}</span></div></p>`).join("");
+  return `<h1>TikTak</h1>
+  <div class="card"><h2>Wrzuć głupotę</h2>
+  <p><input id="cap" placeholder="Coś zabawnego…"></p>
+  <p><button class="btn-primary" id="postTT">Opublikuj</button></p></div>
+  ${posts || (r.offline?`<p class="muted">Brak połączenia z API — wpisy lokalne:</p>`+S.tiktak.map(t=>`<p><div class="card">${esc(t)}</div></p>`).join(""):"<p class='muted'>Jeszcze cicho…</p>")}`;
+}
+
+async function viewMusic(){
+  return `<h1>Muzyka jako emocja</h1>
+  <div class="card"><h2>Generator muzyki</h2>
+  <p><input id="mprompt" placeholder="Wesoła ukulele melodia na powitanie"></p>
+  <p class="row">
+    <select id="mmood" style="width:auto"><option>happy</option><option>calm</option><option>energetic</option><option>sad</option><option>funny</option><option>love</option><option>angry</option></select>
+    <select id="mprov" style="width:auto"><option value="suno">Suno v6</option><option value="puter">Puter.js</option><option value="huggingface">HF</option></select>
+  </p>
+  <p><button class="btn-primary" id="genMusic">Generuj muzykę</button></p>
+  <p class="muted" id="mstatus"></p></div>
+  <p class="muted">Utwory trafiają do kolejki (Cloudflare Queue) i cache R2.</p>`;
+}
+
+function viewSettings(){
+  return `<h1>Ustawienia</h1>
+  <div class="card">
+    <h2>Tłumaczenie</h2>
+    <p class="row"><span style="flex:1">Tłumacz automatycznie</span><input type="checkbox" id="autoTr" ${S.autoTranslate?"checked":""} style="width:auto"></p>
+    <p class="row"><span style="flex:1">Pokazuj oryginał + tłumaczenie</span><input type="checkbox" id="showB" ${S.showBoth?"checked":""} style="width:auto"></p>
+    <p><label>Język docelowy<select id="tlang"><option value="en" ${S.targetLang==="en"?"selected":""}>English</option><option value="pl" ${S.targetLang==="pl"?"selected":""}>Polski</option></select></label></p>
+  </div>
+  <p></p>
+  ${S.user&&S.user.isAdmin?`<button class="btn-secondary" onclick="setView('admin')">👑 Panel Admina</button><p></p>`:""}
+  <button class="btn-secondary" onclick="if(confirm('Wyczyścić dane lokalne?')){localStorage.removeItem('${LS}');location.reload()}">Wyczyść dane aplikacji</button>`;
+}
+
+function viewProfile(){
+  return `<h1>Profil</h1>
+  <div class="card" style="text-align:center">
+    <div style="width:88px;height:88px;border-radius:999px;background:var(--primary);display:grid;place-items:center;font-size:2rem;font-weight:700;margin:0 auto">${esc((S.user?.nick||"?")[0])}</div>
+    <h2>${esc(S.user?.nick)}</h2>
+    <p class="muted">${esc(S.user?.publicId)} • persona: ${esc(PERSONAS[S.persona]?.[0]||S.persona)}</p>
+    ${S.user?.isAdmin?'<span class="badge">👑 Admin</span>':""}
+  </div><p></p>
+  <button class="btn-secondary" onclick="S.user=null;save();setView('onboarding')">Wyloguj</button>`;
+}
+
+async function viewAdmin(){
+  const r = await api("/api/admin/stats");
+  return `<h1>Panel Admina</h1>
+  <div class="card"><h2>Statystyki</h2>
+  <p>Użytkownicy: <b>${r.users??"—"}</b><br>Posty TikTak: <b>${r.tiktakPosts??"—"}</b></p>
+  ${r.error?`<p class="muted">API: ${esc(r.error)}</p>`:""}
+  </div>
+  <p></p><button class="btn-secondary" onclick="setView('settings')">← Ustawienia</button>`;
+}
+
+function bind(){
+  const b1=document.getElementById("postTT");
+  if(b1) b1.onclick=async()=>{
+    const cap=document.getElementById("cap").value.trim(); if(!cap) return;
+    await api("/api/tiktak",{method:"POST",body:JSON.stringify({authorId:S.user.email,caption:cap,mediaType:"text",isFunny:true})});
+    S.tiktak.push(cap); save(); render();
+  };
+  const b2=document.getElementById("genMusic");
+  if(b2) b2.onclick=async()=>{
+    const p=document.getElementById("mprompt").value.trim();
+    const st=document.getElementById("mstatus");
+    if(!p){ st.textContent="Podaj opis utworu"; return; }
+    st.textContent="Generuję…";
+    const r=await api("/api/music/generate",{method:"POST",body:JSON.stringify({prompt:p,mood:document.getElementById("mmood").value,provider:document.getElementById("mprov").value,userId:S.user.email})});
+    st.textContent = r.status==="queued" ? "✓ Wysłano do kolejki generowania (Suno/Puter/HF)" : "⚠ API nieosiągalne: "+(r.error||"?");
+  };
+  const a=document.getElementById("autoTr"); if(a) a.onchange=()=>{S.autoTranslate=a.checked;save();};
+  const sb=document.getElementById("showB"); if(sb) sb.onchange=()=>{S.showBoth=sb.checked;save();};
+  const tl=document.getElementById("tlang"); if(tl) tl.onchange=()=>{S.targetLang=tl.value;save();};
+}
+
+render();
+</script>
+</body>
+</html>
